@@ -1,4 +1,5 @@
 export type Platform = "tiktok" | "instagram" | "youtube_shorts" | "youtube_longform";
+export type Agent = "Maddie" | "Elicia" | "Olivia" | "Seth";
 
 export interface DemographicBar {
   label: string;
@@ -30,8 +31,10 @@ export interface Creator {
   id: string;
   name: string;
   handle: string;
-  avatar: string;
+  avatar: string;      // initials fallback
+  photoUrl?: string;   // profile picture URL
   category: string;
+  agent: Agent;
   platforms: Platform[];
   analytics: Partial<Record<Platform, PlatformAnalytics>>;
   shareToken: string;

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { Creator, Platform } from "@/lib/types";
+import { Creator, Platform, PlatformAnalytics } from "@/lib/types";
 import { formatNum, PLATFORM_LABELS } from "@/lib/mock-data";
 import TopNav from "./TopNav";
 import PlatformToggle from "./PlatformToggle";
@@ -12,6 +13,28 @@ import DemographicsPanel from "./DemographicsPanel";
 interface Props {
   creator: Creator;
   isShare?: boolean;
+}
+
+type Period = "monthly" | "quarterly" | "yearly";
+
+const PERIOD_LABELS: Record<Period, string> = {
+  monthly: "Monthly",
+  quarterly: "Quarterly",
+  yearly: "Yearly",
+};
+
+// Scale total metrics by time period (averages are per-video so stay constant)
+function applyPeriod(data: PlatformAnalytics, period: Period): PlatformAnalytics {
+  const scale = period === "monthly" ? 1 / 12 : period === "quarterly" ? 1 / 4 : 1;
+  const growthScale = period === "monthly" ? 1 : period === "quarterly" ? 3 : 12;
+  if (scale === 1 && growthScale === 12) return data; // yearly = base
+  return {
+    ...data,
+    totalVideos: Math.round(data.totalVideos * scale),
+    totalImpressions: Math.round(data.totalImpressions * scale),
+    totalEngagements: Math.round(data.totalEngagements * scale),
+    followersGrowthPct: parseFloat((data.followersGrowthPct * (period === "monthly" ? 1 : growthScale / 12)).toFixed(1)),
+  };
 }
 
 const Icons = {
@@ -28,7 +51,12 @@ const Icons = {
 
 export default function CreatorDashboard({ creator, isShare = false }: Props) {
   const [activePlatform, setActivePlatform] = useState<Platform>(creator.platforms[0]);
-  const data = creator.analytics[activePlatform];
+  const [period, setPeriod] = useState<Period>("yearly");
+
+  const rawData = creator.analytics[activePlatform];
+  const data = rawData ? applyPeriod(rawData, period) : undefined;
+
+  const growthLabel = period === "monthly" ? "last 30 days" : period === "quarterly" ? "last 90 days" : "last 12 months";
 
   return (
     <>
@@ -45,37 +73,67 @@ export default function CreatorDashboard({ creator, isShare = false }: Props) {
         )}
 
         {/* Creator header */}
-        <div className="flex items-center justify-between mb-8 gap-4">
+        <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gray-100 text-gray-700 flex items-center justify-center text-base font-semibold">
-              {creator.avatar}
+            <div className="w-14 h-14 rounded-2xl bg-gray-100 shrink-0 overflow-hidden relative">
+              {creator.photoUrl && (
+                <Image
+                  src={creator.photoUrl}
+                  alt={creator.name}
+                  fill
+                  className="object-cover"
+                  unoptimized
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
+              )}
+              <span className="absolute inset-0 flex items-center justify-center text-base font-semibold text-gray-600 -z-10">
+                {creator.avatar}
+              </span>
             </div>
             <div>
               <h1 className="text-[22px] font-semibold text-gray-900 tracking-tight leading-tight">{creator.name}</h1>
               <p className="text-[13px] text-gray-400 mt-0.5">{creator.handle} · {creator.category}</p>
             </div>
           </div>
+
           {!isShare && (
             <a
-              href={`/share/${creator.shareToken}`}
+              href={`/creator/${creator.id}/export`}
               target="_blank"
               className="flex items-center gap-2 text-[13px] font-medium bg-white text-gray-700 border border-gray-200 px-4 py-2 rounded-full hover:border-gray-400 hover:text-gray-900 transition-all shrink-0"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17v3a1 1 0 001 1h16a1 1 0 001-1v-3" />
               </svg>
-              Share with Brand
+              Export for Brand
             </a>
           )}
         </div>
 
         {/* Platform Toggle */}
-        <div className="mb-8">
+        <div className="mb-6">
           <PlatformToggle
             available={creator.platforms}
             active={activePlatform}
             onChange={setActivePlatform}
           />
+        </div>
+
+        {/* Period filter */}
+        <div className="flex items-center gap-1.5 mb-8">
+          {(["monthly", "quarterly", "yearly"] as Period[]).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`px-3 py-1 rounded-full text-[12px] font-medium transition-all border ${
+                period === p
+                  ? "bg-gray-900 text-white border-gray-900"
+                  : "bg-white text-gray-500 border-gray-200 hover:border-gray-400"
+              }`}
+            >
+              {PERIOD_LABELS[p]}
+            </button>
+          ))}
         </div>
 
         {!data ? (
@@ -85,7 +143,7 @@ export default function CreatorDashboard({ creator, isShare = false }: Props) {
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-4">Summary</p>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <StatCard label="Followers" value={formatNum(data.followers)} sub={`+${data.followersGrowthPct}% last 30 days`} icon={Icons.followers} />
+                <StatCard label="Followers" value={formatNum(data.followers)} sub={`+${data.followersGrowthPct}% ${growthLabel}`} icon={Icons.followers} />
                 <StatCard label="Engagement" value={`${data.engagementRate}%`} icon={Icons.engagement} />
                 <StatCard label="Follower Engagement" value={`${data.followerEngagementRate}%`} icon={Icons.followerEng} />
                 <StatCard label="Total Videos" value={data.totalVideos.toString()} icon={Icons.videos} />

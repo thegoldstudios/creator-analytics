@@ -1,6 +1,5 @@
-import { Creator, Platform, PlatformAnalytics } from "./types";
+import { Agent, Creator, Platform, PlatformAnalytics } from "./types";
 
-// Demographics are representative placeholders until APIs are connected
 const DEFAULT_AGE_GENDER = {
   all: [
     { label: "18-24", value: 31.2 },
@@ -33,7 +32,6 @@ const UK_COUNTRIES = [
   { country: "Canada", flag: "🇨🇦", pct: 4.1 },
 ];
 
-// Build plausible platform analytics from real follower counts
 function platform(
   p: Platform,
   followers: number,
@@ -75,13 +73,23 @@ function slug(name: string): string {
   return "share_" + name.toLowerCase().replace(/[^a-z0-9]/g, "_").substring(0, 20);
 }
 
+// unavatar.io fetches profile pictures from social platforms by username
+function igPhoto(username: string): string {
+  return `https://unavatar.io/instagram/${username.replace(/^@/, "")}`;
+}
+function ttPhoto(username: string): string {
+  return `https://unavatar.io/tiktok/${username.replace(/^@/, "")}`;
+}
+
 export const CREATORS: Creator[] = [
   {
     id: "1",
     name: "Phoebe Is Ginger",
     handle: "@phoebeisginger1",
     avatar: initials("Phoebe Ginger"),
+    photoUrl: igPhoto("phoebeisginger1"),
     category: "Lifestyle",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram", "youtube_shorts"],
     analytics: {
       tiktok: platform("tiktok", 1_300_000, { growth: 6.2, engRate: 7.1, videos: 340, gender: { male: 32, female: 68 } }),
@@ -95,7 +103,9 @@ export const CREATORS: Creator[] = [
     name: "TA TECH Tips",
     handle: "@tatechtips",
     avatar: initials("TA TECH"),
+    photoUrl: igPhoto("tatechtips"),
     category: "Tech",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram", "youtube_shorts"],
     analytics: {
       tiktok: platform("tiktok", 3_400_000, { growth: 5.4, engRate: 6.8, videos: 420, gender: { male: 72, female: 28 } }),
@@ -109,7 +119,9 @@ export const CREATORS: Creator[] = [
     name: "Jack Knightly",
     handle: "@jackknightley",
     avatar: initials("Jack Knightly"),
+    photoUrl: igPhoto("jackknightley"),
     category: "Comedy",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram", "youtube_shorts"],
     analytics: {
       tiktok: platform("tiktok", 1_700_000, { growth: 7.8, engRate: 8.2, videos: 280, gender: { male: 44, female: 56 } }),
@@ -123,7 +135,9 @@ export const CREATORS: Creator[] = [
     name: "Eleanor Wilkes",
     handle: "@_eleanorwilkes_",
     avatar: initials("Eleanor Wilkes"),
+    photoUrl: igPhoto("_eleanorwilkes_"),
     category: "Fashion",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram", "youtube_shorts"],
     analytics: {
       tiktok: platform("tiktok", 988_600, { growth: 6.9, engRate: 7.4, videos: 310, gender: { male: 21, female: 79 } }),
@@ -137,7 +151,9 @@ export const CREATORS: Creator[] = [
     name: "Daragh Twomey",
     handle: "@daragh2me",
     avatar: initials("Daragh Twomey"),
+    photoUrl: ttPhoto("daragh2me"),
     category: "Sketch Comedy",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram", "youtube_shorts"],
     analytics: {
       tiktok: platform("tiktok", 640_300, { growth: 5.6, engRate: 7.8, videos: 260, gender: { male: 48, female: 52 } }),
@@ -151,7 +167,9 @@ export const CREATORS: Creator[] = [
     name: "Toby Stubbs",
     handle: "@toby_stubbs",
     avatar: initials("Toby Stubbs"),
+    photoUrl: igPhoto("toby_stubbs"),
     category: "Acting",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram", "youtube_shorts", "youtube_longform"],
     analytics: {
       tiktok: platform("tiktok", 291_700, { growth: 4.8, engRate: 6.9, videos: 190, gender: { male: 41, female: 59 } }),
@@ -166,7 +184,9 @@ export const CREATORS: Creator[] = [
     name: "Vicer Versa | Tian",
     handle: "@vicerversa",
     avatar: initials("Vicer Versa"),
+    photoUrl: igPhoto("vicerversa"),
     category: "Street Interview",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram"],
     analytics: {
       tiktok: platform("tiktok", 363_600, { growth: 21.4, engRate: 8.9, videos: 145, gender: { male: 55, female: 45 } }),
@@ -179,7 +199,9 @@ export const CREATORS: Creator[] = [
     name: "dad.jokes.lco | Adam",
     handle: "@dad.jokes.lco",
     avatar: initials("dad jokes"),
+    photoUrl: ttPhoto("dad.jokes.lco"),
     category: "Comedy",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram"],
     analytics: {
       tiktok: platform("tiktok", 345_700, { growth: 8.3, engRate: 9.1, videos: 230, gender: { male: 49, female: 51 } }),
@@ -192,7 +214,9 @@ export const CREATORS: Creator[] = [
     name: "Natasha | mybraindumpingground",
     handle: "@mybraindumpingground",
     avatar: initials("Natasha M"),
+    photoUrl: igPhoto("mybraindumpingground"),
     category: "Sketch Comedy",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram"],
     analytics: {
       tiktok: platform("tiktok", 210_700, { growth: 5.9, engRate: 7.3, videos: 200, gender: { male: 26, female: 74 } }),
@@ -205,7 +229,9 @@ export const CREATORS: Creator[] = [
     name: "Northern Funny Mummy | Kayleigh",
     handle: "@northernfunnymummy",
     avatar: initials("Northern Funny"),
+    photoUrl: igPhoto("northernfunnymummy"),
     category: "Sketch Comedy",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram"],
     analytics: {
       tiktok: platform("tiktok", 197_900, { growth: 6.7, engRate: 8.4, videos: 250, gender: { male: 22, female: 78 } }),
@@ -218,7 +244,9 @@ export const CREATORS: Creator[] = [
     name: "Jasper Pagan",
     handle: "@jasper_pagan",
     avatar: initials("Jasper Pagan"),
+    photoUrl: igPhoto("jasper_pagan"),
     category: "Lifestyle",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram", "youtube_shorts"],
     analytics: {
       tiktok: platform("tiktok", 188_100, { growth: 5.1, engRate: 6.8, videos: 175, gender: { male: 35, female: 65 } }),
@@ -232,7 +260,9 @@ export const CREATORS: Creator[] = [
     name: "Henry da Peng",
     handle: "@henrydapeng1",
     avatar: initials("Henry Peng"),
+    photoUrl: igPhoto("henrydapeng1"),
     category: "Comedy",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram"],
     analytics: {
       tiktok: platform("tiktok", 124_100, { growth: 16.8, engRate: 9.2, videos: 130, gender: { male: 50, female: 50 } }),
@@ -245,7 +275,9 @@ export const CREATORS: Creator[] = [
     name: "Redbusruss | Russell",
     handle: "@redbusruss",
     avatar: initials("Redbusruss R"),
+    photoUrl: igPhoto("redbusruss"),
     category: "Opinions",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram", "youtube_longform"],
     analytics: {
       tiktok: platform("tiktok", 137_900, { growth: 4.3, engRate: 6.1, videos: 190, gender: { male: 58, female: 42 } }),
@@ -259,7 +291,9 @@ export const CREATORS: Creator[] = [
     name: "Joe Foster",
     handle: "@joeefoster",
     avatar: initials("Joe Foster"),
+    photoUrl: igPhoto("joeefoster"),
     category: "LGBTQ+",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram"],
     analytics: {
       tiktok: platform("tiktok", 82_500, { growth: 5.2, engRate: 7.2, videos: 160, gender: { male: 45, female: 55 } }),
@@ -272,7 +306,9 @@ export const CREATORS: Creator[] = [
     name: "Harry Oliver",
     handle: "@harryoliver_29",
     avatar: initials("Harry Oliver"),
+    photoUrl: ttPhoto("harryoliver_29"),
     category: "Gen Z",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram"],
     analytics: {
       tiktok: platform("tiktok", 49_100, { growth: 7.4, engRate: 8.6, videos: 140, gender: { male: 38, female: 62 } }),
@@ -285,7 +321,9 @@ export const CREATORS: Creator[] = [
     name: "Just Jay Online | Jay",
     handle: "@justjayonline",
     avatar: initials("Just Jay"),
+    photoUrl: igPhoto("justjayonline"),
     category: "Comedy",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram"],
     analytics: {
       tiktok: platform("tiktok", 41_900, { growth: 9.1, engRate: 8.8, videos: 110, gender: { male: 47, female: 53 } }),
@@ -298,7 +336,9 @@ export const CREATORS: Creator[] = [
     name: "Ben.m0v",
     handle: "@ben.m0v",
     avatar: initials("Ben M"),
+    photoUrl: ttPhoto("ben.m0v"),
     category: "Gaming & Tech",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram", "youtube_shorts"],
     analytics: {
       tiktok: platform("tiktok", 65_000, { growth: 4.8, engRate: 6.4, videos: 155, gender: { male: 68, female: 32 } }),
@@ -312,7 +352,9 @@ export const CREATORS: Creator[] = [
     name: "Raul Gibson",
     handle: "@raulgibsonyeee",
     avatar: initials("Raul Gibson"),
+    photoUrl: igPhoto("raulgibsonyeee"),
     category: "Comedy",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram"],
     analytics: {
       tiktok: platform("tiktok", 37_200, { growth: 6.1, engRate: 8.1, videos: 95, gender: { male: 52, female: 48 } }),
@@ -325,7 +367,9 @@ export const CREATORS: Creator[] = [
     name: "Rhys Drakeford-Bennett",
     handle: "@rbfilmsyt",
     avatar: initials("Rhys Drakeford"),
+    photoUrl: igPhoto("rbfilmsyt"),
     category: "Sketch Comedy",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram", "youtube_shorts"],
     analytics: {
       tiktok: platform("tiktok", 18_600, { growth: 7.2, engRate: 7.9, videos: 85, gender: { male: 55, female: 45 } }),
@@ -339,7 +383,9 @@ export const CREATORS: Creator[] = [
     name: "Angry Geezer | Ben Collins",
     handle: "@angrygeeza",
     avatar: initials("Angry Geezer"),
+    photoUrl: ttPhoto("angrygeeza"),
     category: "Sketch Comedy",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram"],
     analytics: {
       tiktok: platform("tiktok", 28_500, { growth: 5.5, engRate: 7.6, videos: 130, gender: { male: 61, female: 39 } }),
@@ -352,7 +398,9 @@ export const CREATORS: Creator[] = [
     name: "Dan Lockett",
     handle: "@danielrobertlockett",
     avatar: initials("Dan Lockett"),
+    photoUrl: igPhoto("danielrobertlockett"),
     category: "Sketch Comedy",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram"],
     analytics: {
       tiktok: platform("tiktok", 25_200, { growth: 4.9, engRate: 7.1, videos: 110, gender: { male: 43, female: 57 } }),
@@ -365,7 +413,9 @@ export const CREATORS: Creator[] = [
     name: "sugargabe | Gabriel",
     handle: "@sugargabe",
     avatar: initials("Sugar Gabe"),
+    photoUrl: igPhoto("sugargabe"),
     category: "Comedy Sketches",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram"],
     analytics: {
       tiktok: platform("tiktok", 18_500, { growth: 8.4, engRate: 8.7, videos: 90, gender: { male: 40, female: 60 } }),
@@ -378,7 +428,9 @@ export const CREATORS: Creator[] = [
     name: "Niall no chill",
     handle: "@niallnochill_",
     avatar: initials("Niall Nochill"),
+    photoUrl: igPhoto("niallnochill_"),
     category: "Reviews",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram", "youtube_longform"],
     analytics: {
       tiktok: platform("tiktok", 15_500, { growth: 3.8, engRate: 6.9, videos: 95, gender: { male: 54, female: 46 } }),
@@ -392,7 +444,9 @@ export const CREATORS: Creator[] = [
     name: "Just Dylan",
     handle: "@justdylsn",
     avatar: initials("Just Dylan"),
+    photoUrl: igPhoto("justdylsn"),
     category: "Comedy",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok", "instagram", "youtube_longform"],
     analytics: {
       tiktok: platform("tiktok", 74_600, { growth: 6.4, engRate: 7.8, videos: 150, gender: { male: 46, female: 54 } }),
@@ -406,7 +460,9 @@ export const CREATORS: Creator[] = [
     name: "Michael",
     handle: "@mychaellol",
     avatar: "MC",
+    photoUrl: ttPhoto("mychaellol"),
     category: "Comedy",
+    agent: "Maddie" as Agent,
     platforms: ["tiktok"],
     analytics: {
       tiktok: platform("tiktok", 26_400, { growth: 10.1, engRate: 9.4, videos: 75, gender: { male: 49, female: 51 } }),
@@ -414,6 +470,9 @@ export const CREATORS: Creator[] = [
     shareToken: slug("michael_mychaellol"),
   },
 ];
+
+// Alias so both CREATORS and creators work as import names
+export const creators = CREATORS;
 
 export function formatNum(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
