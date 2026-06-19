@@ -9,7 +9,12 @@ export async function GET(req: NextRequest) {
   const creator = creators.find((c) => c.shareToken === token);
   if (!creator) return NextResponse.json({ error: "Creator not found" }, { status: 404 });
 
-  const connected = await getConnectedPlatforms(creator.id);
+  let connected: string[] = [];
+  try {
+    connected = await getConnectedPlatforms(creator.id);
+  } catch {
+    // KV not configured yet — treat as no connections
+  }
 
   return NextResponse.json({
     creatorId: creator.id,
