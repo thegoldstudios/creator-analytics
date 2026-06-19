@@ -38,4 +38,5 @@ export interface Creator {
   platforms: Platform[];
   analytics: Partial<Record<Platform, PlatformAnalytics>>;
   shareToken: string;
+  youtubeHandle?: string; // e.g. "niallnochill" — used to fetch live YouTube stats
 }

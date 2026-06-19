@@ -427,6 +427,7 @@ export const CREATORS: Creator[] = [
     photoUrl: av("niall-no-chill.jpg"),
     category: "Reviews",
     agent: "Maddie" as Agent,
+    youtubeHandle: "niallnochill",
     platforms: ["tiktok", "instagram", "youtube_longform"],
     analytics: {
       tiktok: platform("tiktok", 15_500, { growth: 3.8, engRate: 6.9, videos: 95, gender: { male: 54, female: 46 } }),
