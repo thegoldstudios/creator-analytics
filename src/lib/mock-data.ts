@@ -464,6 +464,19 @@ export const CREATORS: Creator[] = [
     },
     shareToken: slug("michael_mychaellol"),
   },
+  {
+    id: "26",
+    name: "Chris J Smith",
+    handle: "@officialcjs",
+    avatar: initials("Chris Smith"),
+    category: "Talent Agent",
+    agent: "Maddie" as Agent,
+    platforms: ["instagram"],
+    analytics: {
+      instagram: platform("instagram", 925, { growth: 2.1, engRate: 4.8, videos: 146, gender: { male: 50, female: 50 } }),
+    },
+    shareToken: slug("chris_j_smith"),
+  },
 ];
 
 // Alias so both CREATORS and creators work as import names
