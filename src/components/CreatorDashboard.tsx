@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import CreatorAvatar from "./CreatorAvatar";
 import { Creator, Platform, PlatformAnalytics } from "@/lib/types";
 import { formatNum, PLATFORM_LABELS } from "@/lib/mock-data";
 import TopNav from "./TopNav";
@@ -75,21 +76,13 @@ export default function CreatorDashboard({ creator, isShare = false }: Props) {
         {/* Creator header */}
         <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gray-100 shrink-0 overflow-hidden relative">
-              {creator.photoUrl && (
-                <Image
-                  src={creator.photoUrl}
-                  alt={creator.name}
-                  fill
-                  className="object-cover"
-                  unoptimized
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                />
-              )}
-              <span className="absolute inset-0 flex items-center justify-center text-base font-semibold text-gray-600 -z-10">
-                {creator.avatar}
-              </span>
-            </div>
+            {creator.photoUrl ? (
+              <div className="w-14 h-14 rounded-2xl shrink-0 overflow-hidden relative">
+                <Image src={creator.photoUrl} alt={creator.name} fill className="object-cover" unoptimized />
+              </div>
+            ) : (
+              <CreatorAvatar name={creator.name} initials={creator.avatar} size="lg" />
+            )}
             <div>
               <h1 className="text-[22px] font-semibold text-gray-900 tracking-tight leading-tight">{creator.name}</h1>
               <p className="text-[13px] text-gray-400 mt-0.5">{creator.handle} · {creator.category}</p>

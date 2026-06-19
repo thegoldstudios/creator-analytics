@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import CreatorAvatar from "@/components/CreatorAvatar";
 import { CREATORS, formatNum } from "@/lib/mock-data";
 import { Agent, Platform } from "@/lib/types";
 
@@ -113,23 +114,13 @@ export default function RosterPage() {
                   className="group bg-white rounded-2xl p-5 border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200 block"
                 >
                   <div className="flex items-center gap-3 mb-4">
-                    {/* Profile picture */}
-                    <div className="w-10 h-10 rounded-full bg-gray-100 shrink-0 overflow-hidden relative">
-                      {creator.photoUrl ? (
-                        <Image
-                          src={creator.photoUrl}
-                          alt={creator.name}
-                          fill
-                          className="object-cover"
-                          unoptimized
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                        />
-                      ) : null}
-                      {/* Initials fallback (always rendered, hidden when image loads) */}
-                      <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-gray-600 -z-10">
-                        {creator.avatar}
-                      </span>
-                    </div>
+                    {creator.photoUrl ? (
+                      <div className="w-10 h-10 rounded-full shrink-0 overflow-hidden relative">
+                        <Image src={creator.photoUrl} alt={creator.name} fill className="object-cover" unoptimized />
+                      </div>
+                    ) : (
+                      <CreatorAvatar name={creator.name} initials={creator.avatar} size="sm" />
+                    )}
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-[14px] text-gray-900 leading-tight truncate">{creator.name}</p>
                       <p className="text-[12px] text-gray-400 truncate mt-0.5">{creator.handle}</p>

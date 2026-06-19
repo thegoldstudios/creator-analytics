@@ -61,14 +61,15 @@ export default async function ExportPage({ params }: { params: Promise<{ id: str
         {/* Header */}
         <div className="flex items-start justify-between mb-8 pb-6 border-b border-gray-100">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gray-100 overflow-hidden relative shrink-0">
-              {creator.photoUrl && (
+            {creator.photoUrl ? (
+              <div className="w-16 h-16 rounded-2xl overflow-hidden relative shrink-0">
                 <Image src={creator.photoUrl} alt={creator.name} fill className="object-cover" unoptimized />
-              )}
-              <span className="absolute inset-0 flex items-center justify-center text-lg font-semibold text-gray-600 -z-10">
+              </div>
+            ) : (
+              <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center text-lg font-semibold text-gray-600 shrink-0">
                 {creator.avatar}
-              </span>
-            </div>
+              </div>
+            )}
             <div>
               <h1 className="text-[26px] font-bold text-gray-900 tracking-tight">{creator.name}</h1>
               <p className="text-[13px] text-gray-400 mt-0.5">{creator.handle} · {creator.category}</p>
