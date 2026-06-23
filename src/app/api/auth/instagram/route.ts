@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const CLIENT_ID = process.env.INSTAGRAM_CLIENT_ID ?? "";
-const REDIRECT_URI = process.env.NEXT_PUBLIC_BASE_URL
-  ? `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/instagram/callback`
-  : "https://creator-analytics-ja5p.vercel.app/api/auth/instagram/callback";
+const REDIRECT_URI = "https://creator-analytics-ja5p.vercel.app/api/auth/instagram/callback";
 
-const SCOPES = "instagram_basic,instagram_manage_insights,pages_show_list,pages_read_engagement";
+const SCOPES = "instagram_business_basic,instagram_business_manage_insights";
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
@@ -24,6 +22,6 @@ export async function GET(req: NextRequest) {
   });
 
   return NextResponse.redirect(
-    `https://www.facebook.com/dialog/oauth?${params.toString()}`
+    `https://api.instagram.com/oauth/authorize?${params.toString()}`
   );
 }
