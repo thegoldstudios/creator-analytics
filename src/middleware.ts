@@ -10,8 +10,8 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // TikTok/other verification files are public
-  if (pathname.startsWith("/tiktok")) {
+  // TikTok/other verification files and legal pages are public
+  if (pathname.startsWith("/tiktok") || pathname === "/privacy" || pathname === "/terms") {
     return NextResponse.next();
   }
 
