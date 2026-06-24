@@ -15,6 +15,11 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // Connect links are public — creators link their accounts without needing the agency password
+  if (pathname.startsWith("/connect/") || pathname.startsWith("/api/auth/")) {
+    return NextResponse.next();
+  }
+
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   const expected = Buffer.from(SECRET).toString("base64");
 
