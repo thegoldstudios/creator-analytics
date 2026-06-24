@@ -16,7 +16,7 @@ export function middleware(req: NextRequest) {
   }
 
   // Connect links are public — creators link their accounts without needing the agency password
-  if (pathname.startsWith("/connect/") || pathname.startsWith("/api/auth/")) {
+  if (pathname.startsWith("/connect/") || pathname.startsWith("/api/auth/") || pathname.startsWith("/api/connect/")) {
     return NextResponse.next();
   }
 
