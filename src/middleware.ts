@@ -10,6 +10,11 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // TikTok/other verification files are public
+  if (pathname.startsWith("/tiktok")) {
+    return NextResponse.next();
+  }
+
   // Share links are public — brands don't need a password
   if (pathname.startsWith("/share/")) {
     return NextResponse.next();
