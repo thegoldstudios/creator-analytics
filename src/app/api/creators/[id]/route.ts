@@ -17,6 +17,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     ...(body.agent !== undefined ? { agent: body.agent as Agent } : {}),
     ...(body.platforms !== undefined ? { platforms: body.platforms as Platform[] } : {}),
     ...(body.youtubeHandle !== undefined ? { youtubeHandle: body.youtubeHandle } : {}),
+    ...(body.photoUrl !== undefined ? { photoUrl: body.photoUrl || undefined } : {}),
   };
 
   // Recalculate initials if name changed

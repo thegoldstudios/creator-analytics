@@ -32,6 +32,7 @@ const BLANK_FORM = {
   agent: "Maddie" as Agent,
   platforms: [] as Platform[],
   youtubeHandle: "",
+  photoUrl: "",
 };
 
 export default function RosterPage() {
@@ -46,6 +47,8 @@ export default function RosterPage() {
   const [form, setForm] = useState(BLANK_FORM);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [fetchingPhoto, setFetchingPhoto] = useState(false);
+  const [photoFetchError, setPhotoFetchError] = useState("");
 
   const fetchCreators = useCallback(async () => {
     const res = await fetch("/api/creators");
@@ -67,6 +70,7 @@ export default function RosterPage() {
   function openAdd() {
     setForm(BLANK_FORM);
     setEditing(null);
+    setPhotoFetchError("");
     setModal("add");
   }
 
@@ -80,9 +84,30 @@ export default function RosterPage() {
       agent: c.agent,
       platforms: [...c.platforms],
       youtubeHandle: c.youtubeHandle ?? "",
+      photoUrl: c.photoUrl ?? "",
     });
     setEditing(c);
+    setPhotoFetchError("");
     setModal("edit");
+  }
+
+  async function fetchPhoto() {
+    if (!form.youtubeHandle.trim()) return;
+    setFetchingPhoto(true);
+    setPhotoFetchError("");
+    try {
+      const res = await fetch(`/api/creators/photo?youtubeHandle=${encodeURIComponent(form.youtubeHandle.trim())}`);
+      const data = await res.json();
+      if (data.photoUrl) {
+        setForm((f) => ({ ...f, photoUrl: data.photoUrl }));
+      } else {
+        setPhotoFetchError("Channel not found");
+      }
+    } catch {
+      setPhotoFetchError("Failed to fetch");
+    } finally {
+      setFetchingPhoto(false);
+    }
   }
 
   function togglePlatform(p: Platform) {
@@ -102,7 +127,7 @@ export default function RosterPage() {
         const res = await fetch("/api/creators", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
+          body: JSON.stringify({ ...form, photoUrl: form.photoUrl || undefined }),
         });
         const created = await res.json();
         setCreators((prev) => [...prev, created]);
@@ -381,13 +406,53 @@ export default function RosterPage() {
 
               <div>
                 <label className="block text-[12px] font-medium text-gray-600 mb-1">YouTube Handle <span className="text-gray-400 font-normal">(for live stats)</span></label>
-                <input
-                  type="text"
-                  value={form.youtubeHandle}
-                  onChange={(e) => setForm((f) => ({ ...f, youtubeHandle: e.target.value }))}
-                  placeholder="e.g. niallnochill"
-                  className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={form.youtubeHandle}
+                    onChange={(e) => setForm((f) => ({ ...f, youtubeHandle: e.target.value }))}
+                    placeholder="e.g. niallnochill"
+                    className="flex-1 px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={fetchPhoto}
+                    disabled={!form.youtubeHandle.trim() || fetchingPhoto}
+                    className="px-3 py-2 text-[12px] font-medium border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors whitespace-nowrap"
+                  >
+                    {fetchingPhoto ? "…" : "Fetch photo"}
+                  </button>
+                </div>
+                {photoFetchError && <p className="text-[11px] text-red-400 mt-1">{photoFetchError}</p>}
+              </div>
+
+              <div>
+                <label className="block text-[12px] font-medium text-gray-600 mb-1">
+                  Profile Photo
+                  {form.photoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, photoUrl: "" }))}
+                      className="ml-2 text-red-400 hover:text-red-600 font-normal"
+                    >
+                      remove
+                    </button>
+                  )}
+                </label>
+                {form.photoUrl ? (
+                  <div className="flex items-center gap-3">
+                    <img src={form.photoUrl} alt="Preview" className="w-12 h-12 rounded-full object-cover border border-gray-200" />
+                    <p className="text-[11px] text-gray-400 truncate flex-1">{form.photoUrl}</p>
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={form.photoUrl}
+                    onChange={(e) => setForm((f) => ({ ...f, photoUrl: e.target.value }))}
+                    placeholder="Paste an image URL, or use Fetch photo above"
+                    className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                  />
+                )}
               </div>
             </div>
 

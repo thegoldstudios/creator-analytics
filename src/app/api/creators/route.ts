@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
     analytics: {},
     shareToken: slug + "_" + newId,
     ...(body.youtubeHandle ? { youtubeHandle: body.youtubeHandle } : {}),
+    ...(body.photoUrl ? { photoUrl: body.photoUrl } : {}),
   };
 
   await upsertCreator(creator);
