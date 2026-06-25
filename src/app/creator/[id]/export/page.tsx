@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Image from "next/image";
-import { CREATORS, formatNum, PLATFORM_LABELS } from "@/lib/mock-data";
+import { getAllCreators } from "@/lib/creators-store";
+import { formatNum, PLATFORM_LABELS } from "@/lib/mock-data";
 import { Platform, PlatformAnalytics } from "@/lib/types";
 import ExportTrigger from "@/components/ExportTrigger";
 
@@ -48,7 +49,8 @@ function PlatformSection({ platform, data }: { platform: Platform; data: Platfor
 
 export default async function ExportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const creator = CREATORS.find((c) => c.id === id);
+  const all = await getAllCreators();
+  const creator = all.find((c) => c.id === id);
   if (!creator) notFound();
 
   const today = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
