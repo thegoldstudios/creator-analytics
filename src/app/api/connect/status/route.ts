@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { creators } from "@/lib/mock-data";
+import { getAllCreators } from "@/lib/creators-store";
 import { getConnectedPlatforms } from "@/lib/kv";
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
   if (!token) return NextResponse.json({ error: "Missing token" }, { status: 400 });
 
-  const creator = creators.find((c) => c.shareToken === token);
+  const all = await getAllCreators();
+  const creator = all.find((c) => c.shareToken === token);
   if (!creator) return NextResponse.json({ error: "Creator not found" }, { status: 404 });
 
   let connected: string[] = [];
