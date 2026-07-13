@@ -35,6 +35,43 @@ export async function getToken(
   return typeof raw === "string" ? JSON.parse(raw) : raw;
 }
 
+const YOUTUBE_CLIENT_ID = process.env.YOUTUBE_CLIENT_ID ?? "";
+const YOUTUBE_CLIENT_SECRET = process.env.YOUTUBE_CLIENT_SECRET ?? "";
+
+export async function refreshYouTubeToken(
+  creatorId: string
+): Promise<string | null> {
+  const token = await getToken(creatorId, "youtube");
+  if (!token) return null;
+
+  const expiresAt = parseInt(token.expires_at ?? "0");
+  if (Date.now() < expiresAt - 60_000) return token.access_token;
+
+  if (!token.refresh_token) return null;
+
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: YOUTUBE_CLIENT_ID,
+      client_secret: YOUTUBE_CLIENT_SECRET,
+      refresh_token: token.refresh_token,
+      grant_type: "refresh_token",
+    }),
+  });
+
+  if (!res.ok) return null;
+  const data = await res.json();
+
+  const updated = {
+    ...token,
+    access_token: data.access_token,
+    expires_at: String(Date.now() + data.expires_in * 1000),
+  };
+  await storeToken(creatorId, "youtube", updated);
+  return data.access_token;
+}
+
 export async function getConnectedPlatforms(creatorId: string): Promise<string[]> {
   const store = await getKV();
   if (!store) return [];

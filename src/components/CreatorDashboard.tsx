@@ -50,38 +50,80 @@ const Icons = {
   comments: <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
 };
 
-interface YouTubeStats {
+interface YouTubeAnalytics {
   subscribers: number;
+  totalVideos: number;
   totalViews: number;
-  videoCount: number;
+  totalImpressions: number;
+  totalLikes: number;
+  totalComments: number;
+  avgViews: number;
+  avgLikes: number;
+  avgComments: number;
+  engagementRate: number;
+  followerEngagementRate: number;
+  followersGrowthPct: number;
+  gender: { male: number; female: number };
+  ageGender: { all: { label: string; value: number }[]; male: { label: string; value: number }[]; female: { label: string; value: number }[] };
+  topCountries: { country: string; flag: string; pct: number }[];
+  live: boolean;
 }
 
 export default function CreatorDashboard({ creator, isShare = false }: Props) {
   const [activePlatform, setActivePlatform] = useState<Platform>(creator.platforms[0]);
   const [period, setPeriod] = useState<Period>("yearly");
-  const [ytStats, setYtStats] = useState<YouTubeStats | null>(null);
+  const [ytAnalytics, setYtAnalytics] = useState<YouTubeAnalytics | null>(null);
   const [ytLive, setYtLive] = useState(false);
 
-  // Fetch live YouTube stats if this creator has a YouTube handle
+  // Try to fetch OAuth-backed YouTube Analytics first; fall back to public API stats
   useEffect(() => {
-    if (!creator.youtubeHandle) return;
-    fetch(`/api/youtube/stats?handle=${creator.youtubeHandle}`)
+    fetch(`/api/youtube/analytics?creatorId=${creator.id}`)
       .then((r) => r.json())
       .then((d) => {
-        if (d.subscribers) {
-          setYtStats(d);
-          setYtLive(true);
-        }
+        if (d.live) { setYtAnalytics(d); setYtLive(true); }
       })
-      .catch(() => {});
-  }, [creator.youtubeHandle]);
+      .catch(() => {})
+      .finally(() => {
+        // If no OAuth analytics and creator has a YouTube handle, fetch public stats
+        setYtAnalytics((prev) => {
+          if (prev) return prev;
+          if (!creator.youtubeHandle) return null;
+          fetch(`/api/youtube/stats?handle=${creator.youtubeHandle}`)
+            .then((r) => r.json())
+            .then((d) => {
+              if (d.subscribers) {
+                setYtAnalytics({ subscribers: d.subscribers, totalVideos: d.videoCount, totalViews: d.totalViews, totalImpressions: 0, totalLikes: 0, totalComments: 0, avgViews: 0, avgLikes: 0, avgComments: 0, engagementRate: 0, followerEngagementRate: 0, followersGrowthPct: 0, gender: { male: 0, female: 0 }, ageGender: { all: [], male: [], female: [] }, topCountries: [], live: false });
+              }
+            })
+            .catch(() => {});
+          return null;
+        });
+      });
+  }, [creator.id, creator.youtubeHandle]);
 
   const isYouTubePlatform = activePlatform === "youtube_shorts" || activePlatform === "youtube_longform";
   const rawData = creator.analytics[activePlatform];
 
-  // Overlay real YouTube subscriber count when live data is available
-  const patchedRaw = rawData && ytStats && isYouTubePlatform
-    ? { ...rawData, followers: ytStats.subscribers, totalVideos: ytStats.videoCount }
+  // Overlay real YouTube analytics when available
+  const patchedRaw = rawData && ytAnalytics && isYouTubePlatform
+    ? {
+        ...rawData,
+        followers: ytAnalytics.subscribers,
+        totalVideos: ytAnalytics.totalVideos,
+        ...(ytLive ? {
+          totalImpressions: ytAnalytics.totalImpressions,
+          totalEngagements: ytAnalytics.totalLikes + ytAnalytics.totalComments,
+          avgViews: ytAnalytics.avgViews,
+          avgLikes: ytAnalytics.avgLikes,
+          avgComments: ytAnalytics.avgComments,
+          engagementRate: ytAnalytics.engagementRate,
+          followerEngagementRate: ytAnalytics.followerEngagementRate,
+          followersGrowthPct: ytAnalytics.followersGrowthPct,
+          gender: ytAnalytics.gender,
+          ageGender: ytAnalytics.ageGender,
+          topCountries: ytAnalytics.topCountries,
+        } : {}),
+      }
     : rawData;
 
   const data = patchedRaw ? applyPeriod(patchedRaw, period) : undefined;
@@ -165,7 +207,7 @@ export default function CreatorDashboard({ creator, isShare = false }: Props) {
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-4">Summary</p>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <StatCard label="Followers" value={formatNum(data.followers)} sub={ytLive && isYouTubePlatform ? "● Live from YouTube" : `+${data.followersGrowthPct}% ${growthLabel}`} icon={Icons.followers} />
+                <StatCard label="Followers" value={formatNum(data.followers)} sub={ytAnalytics && isYouTubePlatform ? (ytLive ? "● Live from YouTube Analytics" : "● Live from YouTube") : `+${data.followersGrowthPct}% ${growthLabel}`} icon={Icons.followers} />
                 <StatCard label="Engagement" value={`${data.engagementRate}%`} icon={Icons.engagement} />
                 <StatCard label="Follower Engagement" value={`${data.followerEngagementRate}%`} icon={Icons.followerEng} />
                 <StatCard label="Total Videos" value={data.totalVideos.toString()} icon={Icons.videos} />
