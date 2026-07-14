@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { creators } from "@/lib/mock-data";
+import { getAllCreators } from "@/lib/creators-store";
 import { storeToken } from "@/lib/kv";
 
 const CLIENT_ID = process.env.INSTAGRAM_CLIENT_ID ?? "";
@@ -20,7 +20,8 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const creator = creators.find((c) => c.shareToken === shareToken);
+  const all = await getAllCreators();
+  const creator = all.find((c) => c.shareToken === shareToken);
   if (!creator) return NextResponse.redirect(new URL("/", req.url));
 
   // Exchange code for short-lived token

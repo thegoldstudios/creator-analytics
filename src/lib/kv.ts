@@ -72,6 +72,35 @@ export async function refreshYouTubeToken(
   return data.access_token;
 }
 
+const INSTAGRAM_CLIENT_SECRET = process.env.INSTAGRAM_CLIENT_SECRET ?? "";
+
+export async function refreshInstagramToken(
+  creatorId: string
+): Promise<{ accessToken: string; userId: string } | null> {
+  const token = await getToken(creatorId, "instagram");
+  if (!token) return null;
+
+  const expiresAt = parseInt(token.expires_at ?? "0");
+  // Refresh if within 7 days of expiry
+  if (Date.now() < expiresAt - 7 * 24 * 60 * 60 * 1000) {
+    return { accessToken: token.access_token, userId: token.user_id };
+  }
+
+  const res = await fetch(
+    `https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${token.access_token}&client_secret=${INSTAGRAM_CLIENT_SECRET}`
+  );
+  if (!res.ok) return { accessToken: token.access_token, userId: token.user_id };
+
+  const data = await res.json();
+  const updated = {
+    ...token,
+    access_token: data.access_token ?? token.access_token,
+    expires_at: String(Date.now() + (data.expires_in ?? 5184000) * 1000),
+  };
+  await storeToken(creatorId, "instagram", updated);
+  return { accessToken: updated.access_token, userId: token.user_id };
+}
+
 export async function getConnectedPlatforms(creatorId: string): Promise<string[]> {
   const store = await getKV();
   if (!store) return [];
