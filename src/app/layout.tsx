@@ -5,7 +5,7 @@ import "./globals.css";
 const geist = Geist({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "The Gold Studios | Creator Analytics",
+  title: "Gold Studios Talent Analytics",
   description: "Live creator analytics dashboard",
 };
 

@@ -7,6 +7,7 @@ import CreatorAvatar from "./CreatorAvatar";
 import { Creator, Platform, PlatformAnalytics } from "@/lib/types";
 import { formatNum, PLATFORM_LABELS } from "@/lib/mock-data";
 import TopNav from "./TopNav";
+import Footer from "./Footer";
 import PlatformToggle from "./PlatformToggle";
 import StatCard from "./StatCard";
 import DemographicsPanel from "./DemographicsPanel";
@@ -306,6 +307,7 @@ export default function CreatorDashboard({ creator, isShare = false }: Props) {
           </div>
         )}
       </div>
+      <Footer />
     </>
   );
 }

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import CreatorAvatar from "@/components/CreatorAvatar";
+import Footer from "@/components/Footer";
 import { formatNum } from "@/lib/mock-data";
 import { Agent, Creator, Platform } from "@/lib/types";
 
@@ -517,6 +518,7 @@ export default function RosterPage() {
           </div>
         </div>
       )}
+      <Footer />
     </>
   );
 }
