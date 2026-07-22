@@ -75,6 +75,11 @@ export default function LoginPage() {
         <p className="text-center text-[11px] text-gray-300 mt-6">
           The Gold Studios · Creator Analytics Platform
         </p>
+        <p className="text-center text-[11px] text-gray-300 mt-3 space-x-3">
+          <a href="/privacy" className="hover:text-gray-500 transition-colors">Privacy Policy</a>
+          <span>·</span>
+          <a href="/terms" className="hover:text-gray-500 transition-colors">Terms of Service</a>
+        </p>
       </div>
     </div>
   );
