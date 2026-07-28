@@ -9,12 +9,13 @@ export interface MondayDeal {
   talentName: string | null;
   talentProfileId: string | null;
   stage: string;
-  dealValue: number;      // raw numeric value (raw currency, not converted)
+  priority: string | null;
+  dealValue: number;
   platforms: string[];
   wonDate: string | null;
   dealType: string;
-  talentCut: number;      // 80%
-  tgsCut: number;         // 20%
+  talentCut: number;
+  tgsCut: number;
 }
 
 function parseNum(text: string | null | undefined): number {
@@ -29,7 +30,7 @@ export async function fetchAllDeals(): Promise<MondayDeal[]> {
 
   // Query specific groups so we don't miss Won/Campaign Complete items
   // (global items_page limit can cut off items in later groups)
-  const COLS = `["board_relation_mm0zyhyb","deal_stage","numeric_mkxn9km7","formula_mm3j815q","formula_mm3jf9q2","dropdown_mky8d1kf","date_mky8cdtj","color_mkth7qj"]`;
+  const COLS = `["board_relation_mm0zyhyb","deal_stage","numeric_mkxn9km7","formula_mm3j815q","formula_mm3jf9q2","dropdown_mky8d1kf","date_mky8cdtj","color_mkth7qj","status9"]`;
   const ITEM_FRAGMENT = `
     id name
     group { id title }
@@ -97,6 +98,7 @@ export async function fetchAllDeals(): Promise<MondayDeal[]> {
       talentName,
       talentProfileId,
       stage: cols["deal_stage"]?.text ?? "Unknown",
+      priority: cols["status9"]?.text || null,
       dealValue,
       platforms,
       wonDate: cols["date_mky8cdtj"]?.text ?? null,

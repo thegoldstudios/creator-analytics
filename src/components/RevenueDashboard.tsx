@@ -19,6 +19,7 @@ export interface CreatorRevSummary {
   agent: Agent | null;
   photoUrl: string | null;
   avatar: string | null;
+  priority: string | null;
 }
 
 interface Props {
@@ -177,7 +178,16 @@ export default function RevenueDashboard({ summaries, error }: Props) {
                         <Stat label="Avg Deal" value={s.avgDealSize > 0 ? fmtNum(s.avgDealSize) : "—"} />
                         <Stat label="Revenue" value={s.totalRevenue > 0 ? fmtNum(s.totalRevenue) : "—"} />
                         <Stat label="Deals Won" value={String(s.totalDeals)} />
-                        <Stat label="TGS Cut" value={s.tgsRevenue > 0 ? fmtNum(s.tgsRevenue) : "—"} />
+                        <div>
+                          <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Priority</p>
+                          {s.priority ? (
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${priorityColor(s.priority)}`}>
+                              {s.priority}
+                            </span>
+                          ) : (
+                            <p className="text-[15px] font-semibold text-gray-900">—</p>
+                          )}
+                        </div>
                       </div>
 
                       {s.activeDeals > 0 && (
@@ -203,6 +213,16 @@ export default function RevenueDashboard({ summaries, error }: Props) {
       <Footer />
     </div>
   );
+}
+
+function priorityColor(p: string): string {
+  const l = p.toLowerCase();
+  if (l.includes("urgent")) return "bg-red-100 text-red-600";
+  if (l.includes("high")) return "bg-orange-100 text-orange-600";
+  if (l.includes("push")) return "bg-yellow-100 text-yellow-700";
+  if (l.includes("medium")) return "bg-blue-100 text-blue-600";
+  if (l.includes("low")) return "bg-gray-100 text-gray-500";
+  return "bg-gray-100 text-gray-600";
 }
 
 function StatWidget({ label, value, sub }: { label: string; value: string; sub: string }) {

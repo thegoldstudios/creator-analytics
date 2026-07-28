@@ -57,8 +57,11 @@ export default async function RevenuePage() {
         agent: match?.agent ?? null,
         photoUrl: match?.photoUrl ?? null,
         avatar: match?.avatar ?? null,
+        priority: deal.priority,
       };
     }
+    // Update priority from the most recent deal that has one
+    if (deal.priority) byTalent[key].priority = deal.priority;
     if (isWon(deal)) {
       byTalent[key].totalDeals++;
       byTalent[key].totalRevenue += deal.dealValue;
