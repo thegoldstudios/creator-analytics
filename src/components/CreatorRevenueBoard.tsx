@@ -222,7 +222,14 @@ export default function CreatorRevenueBoard({ creator, initialDeals }: { creator
     ? Object.entries(deals.stageCounts).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value)
     : [];
 
-  const ongoingDeals = deals ? [...deals.activeDeals, ...deals.wonDeals.slice(0, 10)] : [];
+  const ongoingDeals = deals
+    ? [
+        ...deals.wonDeals
+          .filter((d) => d.stage !== "Lost" && d.stage !== "Cancelled")
+          .sort((a, b) => (b.wonDate ?? "").localeCompare(a.wonDate ?? "")),
+        ...deals.activeDeals.filter((d) => d.stage !== "Lost" && d.stage !== "Cancelled"),
+      ]
+    : [];
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
