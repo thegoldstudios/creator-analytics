@@ -5,37 +5,9 @@ import Link from "next/link";
 import TopNav from "@/components/TopNav";
 import Footer from "@/components/Footer";
 import { Creator } from "@/lib/types";
+import { CreatorDeals, RevenueSlice } from "@/lib/creator-deals";
 
 type Period = "lifetime" | "year" | "quarter" | "month" | "week";
-
-interface RevenueSlice { talentCut: number; tgsCut: number }
-
-interface DealItem {
-  id: string;
-  name: string;
-  url: string;
-  stage: string;
-  dealValue: number;
-  platforms: string[];
-  dealType: string;
-  wonDate?: string;
-  group: string;
-}
-
-interface CreatorDeals {
-  totalDeals: number;
-  totalRevenue: number;
-  avgDealSize: number;
-  tgsRevenue: number;
-  platformCounts: Record<string, number>;
-  stageCounts: Record<string, number>;
-  revenueByMonth: Record<string, RevenueSlice>;
-  revenueByQuarter: Record<string, RevenueSlice>;
-  revenueByYear: Record<string, RevenueSlice>;
-  revenueByWeek: Record<string, RevenueSlice>;
-  activeDeals: DealItem[];
-  wonDeals: DealItem[];
-}
 
 function fmt(n: number) {
   if (n >= 1_000_000) return `£${(n / 1_000_000).toFixed(1)}m`;
@@ -195,22 +167,11 @@ const PERIOD_LABELS: Record<Period, string> = {
   week: "Week",
 };
 
-export default function CreatorRevenueBoard({ creator }: { creator: Creator }) {
-  const [deals, setDeals] = useState<CreatorDeals | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export default function CreatorRevenueBoard({ creator, initialDeals }: { creator: Creator; initialDeals: CreatorDeals | null }) {
+  const [deals] = useState<CreatorDeals | null>(initialDeals);
+  const loading = false;
+  const error = initialDeals === null ? "No deal data found" : null;
   const [period, setPeriod] = useState<Period>("month");
-
-  useEffect(() => {
-    fetch(`/api/monday/creator-deals?talentName=${encodeURIComponent(creator.name)}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.error) setError(d.error);
-        else setDeals(d);
-      })
-      .catch(() => setError("Failed to load"))
-      .finally(() => setLoading(false));
-  }, [creator.name]);
 
   const periodMap: Record<Exclude<Period, "lifetime">, Record<string, RevenueSlice>> = deals ? {
     month: deals.revenueByMonth,
@@ -224,17 +185,18 @@ export default function CreatorRevenueBoard({ creator }: { creator: Creator }) {
     ? chartData(deals?.revenueByMonth ?? {})
     : chartData(periodMap[period]);
 
-  // Period-specific stat card values
+  // Period-specific stat card values — derived from barData so they always match the chart
   const periodStats = (() => {
     if (!deals) return { count: 0, revenue: 0, avg: 0, tgs: 0 };
     if (period === "lifetime") {
       return { count: deals.totalDeals, revenue: deals.totalRevenue, avg: deals.avgDealSize, tgs: deals.tgsRevenue };
     }
-    const keys = new Set(Object.keys(periodMap[period]));
-    const filtered = deals.wonDeals.filter((d) => d.wonDate && keys.has(dateToKey(d.wonDate, period)));
-    const revenue = filtered.reduce((s, d) => s + d.dealValue, 0);
-    const count = filtered.length;
+    // Sum revenue and TGS cut from the chart bars (guaranteed to match the visible chart)
+    const revenue = barData.reduce((s, d) => s + d.talentCut + d.tgsCut, 0);
     const tgs = barData.reduce((s, d) => s + d.tgsCut, 0);
+    // Count deals whose wonDate maps into the current period's keys
+    const keys = new Set(Object.keys(periodMap[period]));
+    const count = deals.wonDeals.filter((d) => d.wonDate && keys.has(dateToKey(d.wonDate, period))).length;
     return { count, revenue, avg: count > 0 ? Math.round(revenue / count) : 0, tgs };
   })();
 
