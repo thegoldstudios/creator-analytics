@@ -1,3 +1,5 @@
+import { unstable_cache } from "next/cache";
+
 const MONDAY_API = "https://api.monday.com/v2";
 const BOARD_ID = 2084113525;
 
@@ -23,7 +25,7 @@ function parseNum(text: string | null | undefined): number {
   return isNaN(n) ? 0 : n;
 }
 
-export async function fetchAllDeals(): Promise<MondayDeal[]> {
+async function _fetchAllDeals(): Promise<MondayDeal[]> {
   const token = process.env.MONDAY_API_TOKEN;
   if (!token) throw new Error("MONDAY_API_TOKEN not set");
 
@@ -107,6 +109,9 @@ export async function fetchAllDeals(): Promise<MondayDeal[]> {
   });
 }
 
+// Cache Monday data for 5 minutes so repeated page loads don't all hit the API
+export const fetchAllDeals = unstable_cache(_fetchAllDeals, ["monday-deals"], { revalidate: 300 });
+
 const TALENT_BOARD_ID = 2110287888;
 
 // Map agent full name → our Agent type
@@ -132,7 +137,7 @@ export interface TalentProfile {
   status: string | null; // Happy, Urgent, Push, Leaving, etc.
 }
 
-export async function fetchTalentProfiles(): Promise<TalentProfile[]> {
+async function _fetchTalentProfiles(): Promise<TalentProfile[]> {
   const token = process.env.MONDAY_API_TOKEN;
   if (!token) throw new Error("MONDAY_API_TOKEN not set");
 
@@ -176,6 +181,8 @@ export async function fetchTalentProfiles(): Promise<TalentProfile[]> {
     };
   });
 }
+
+export const fetchTalentProfiles = unstable_cache(_fetchTalentProfiles, ["monday-talent-profiles"], { revalidate: 300 });
 
 // Groups that count as completed/won deals
 const DONE_GROUPS = new Set(["group_mkthf2s3", "group_mkvk4h72"]); // Won + Campaign Complete

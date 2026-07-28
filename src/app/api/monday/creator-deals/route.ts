@@ -105,7 +105,7 @@ export async function GET(req: NextRequest) {
         wonDate: d.wonDate,
         group: d.group.title,
       })),
-    });
+    }, { headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=600" } });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: msg }, { status: 500 });
