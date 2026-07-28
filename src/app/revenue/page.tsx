@@ -13,7 +13,6 @@ export default async function RevenuePage() {
   let deals: MondayDeal[] = [];
   let error: string | null = null;
 
-  // Fetch deals and talent profiles in parallel
   const [dealsResult, profilesResult, creatorsResult] = await Promise.allSettled([
     fetchAllDeals(),
     fetchTalentProfiles(),
@@ -23,24 +22,16 @@ export default async function RevenuePage() {
   if (dealsResult.status === "fulfilled") deals = dealsResult.value;
   else error = dealsResult.reason instanceof Error ? dealsResult.reason.message : "Failed to load deals";
 
-  // Build talent profile map: id → { agent, status }
-  const profileMap: Record<string, { agent: string | null; status: string | null }> = {};
-  if (profilesResult.status === "fulfilled") {
-    for (const p of profilesResult.value) {
-      profileMap[p.id] = { agent: p.agent, status: p.status };
-    }
-  }
+  const profiles = profilesResult.status === "fulfilled" ? profilesResult.value : [];
+  const creators = creatorsResult.status === "fulfilled" ? creatorsResult.value : [];
 
-  // Build creator map for photos: norm(name) → { id, photoUrl, avatar }
+  // Creator photo/avatar lookup by normalised name
   const creatorByNorm: Record<string, { id: string; photoUrl?: string; avatar: string }> = {};
-  if (creatorsResult.status === "fulfilled") {
-    for (const c of creatorsResult.value) {
-      creatorByNorm[norm(c.name)] = { id: c.id, photoUrl: c.photoUrl, avatar: c.avatar };
-    }
+  for (const c of creators) {
+    creatorByNorm[norm(c.name)] = { id: c.id, photoUrl: c.photoUrl, avatar: c.avatar };
   }
 
-  function matchCreator(talentName: string | null) {
-    if (!talentName) return null;
+  function matchCreator(talentName: string) {
     const n = norm(talentName);
     for (const [key, val] of Object.entries(creatorByNorm)) {
       if (key.includes(n) || n.includes(key)) return val;
@@ -48,44 +39,43 @@ export default async function RevenuePage() {
     return null;
   }
 
-  const byTalent: Record<string, CreatorRevSummary> = {};
-
+  // Aggregate deals by talent profile ID
+  const dealsByProfile: Record<string, { totalDeals: number; totalRevenue: number; tgsRevenue: number; activeDeals: number }> = {};
   for (const deal of deals) {
-    const key = deal.talentProfileId ?? deal.talentName ?? "";
+    const key = deal.talentProfileId ?? "";
     if (!key) continue;
+    if (!dealsByProfile[key]) dealsByProfile[key] = { totalDeals: 0, totalRevenue: 0, tgsRevenue: 0, activeDeals: 0 };
+    if (isWon(deal)) {
+      dealsByProfile[key].totalDeals++;
+      dealsByProfile[key].totalRevenue += deal.dealValue;
+      dealsByProfile[key].tgsRevenue += deal.tgsCut;
+    }
+    if (isActive(deal)) {
+      dealsByProfile[key].activeDeals++;
+    }
+  }
 
-    if (!byTalent[key]) {
-      const profile = deal.talentProfileId ? profileMap[deal.talentProfileId] : null;
-      const match = matchCreator(deal.talentName);
-      byTalent[key] = {
-        talentProfileId: key,
-        talentName: deal.talentName ?? "Unknown",
-        totalDeals: 0,
-        totalRevenue: 0,
-        avgDealSize: 0,
-        tgsRevenue: 0,
-        activeDeals: 0,
-        // Agent comes from Monday Talent Profiles board — authoritative
-        agent: (profile?.agent ?? null) as Agent | null,
-        talentStatus: profile?.status ?? null,
+  // Build summaries from ALL talent profiles (not just those with deals)
+  const summaries: CreatorRevSummary[] = profiles
+    .filter((p) => p.agent !== null) // only show managed talent
+    .map((p): CreatorRevSummary => {
+      const d = dealsByProfile[p.id] ?? { totalDeals: 0, totalRevenue: 0, tgsRevenue: 0, activeDeals: 0 };
+      const match = matchCreator(p.name);
+      return {
+        talentProfileId: p.id,
+        talentName: p.name,
+        totalDeals: d.totalDeals,
+        totalRevenue: d.totalRevenue,
+        avgDealSize: d.totalDeals > 0 ? Math.round(d.totalRevenue / d.totalDeals) : 0,
+        tgsRevenue: d.tgsRevenue,
+        activeDeals: d.activeDeals,
+        agent: p.agent as Agent | null,
+        talentStatus: p.status,
         creatorId: match?.id ?? null,
         photoUrl: match?.photoUrl ?? null,
         avatar: match?.avatar ?? null,
       };
-    }
-
-    if (isWon(deal)) {
-      byTalent[key].totalDeals++;
-      byTalent[key].totalRevenue += deal.dealValue;
-      byTalent[key].tgsRevenue += deal.tgsCut;
-    }
-    if (isActive(deal)) {
-      byTalent[key].activeDeals++;
-    }
-  }
-
-  const summaries: CreatorRevSummary[] = Object.values(byTalent)
-    .map((s) => ({ ...s, avgDealSize: s.totalDeals > 0 ? Math.round(s.totalRevenue / s.totalDeals) : 0 }))
+    })
     .sort((a, b) => b.totalRevenue - a.totalRevenue || b.activeDeals - a.activeDeals);
 
   return <RevenueDashboard summaries={summaries} error={error} />;
