@@ -37,6 +37,20 @@ function chartData(map: Record<string, RevenueSlice>): { label: string; talentCu
     .map(([label, v]) => ({ label, ...v }));
 }
 
+// Current period key for "now" — used to filter stat cards to the current real-world period
+function currentPeriodKey(period: Exclude<Period, "lifetime">): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth() + 1;
+  if (period === "year") return String(y);
+  if (period === "month") return `${y}-${String(m).padStart(2, "0")}`;
+  if (period === "quarter") return `${y} Q${Math.ceil(m / 3)}`;
+  // week
+  const startOfYear = new Date(y, 0, 1);
+  const week = Math.ceil(((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7);
+  return `${y}-W${String(week).padStart(2, "0")}`;
+}
+
 // Map a wonDate string to the period key format used by the API
 function dateToKey(dateStr: string, period: Period): string {
   const date = new Date(dateStr);
@@ -185,18 +199,18 @@ export default function CreatorRevenueBoard({ creator, initialDeals }: { creator
     ? chartData(deals?.revenueByMonth ?? {})
     : chartData(periodMap[period]);
 
-  // Period-specific stat card values — derived from barData so they always match the chart
+  // Stat cards reflect the CURRENT real-world period (e.g. this month, this year)
+  // so they change meaningfully when toggling
   const periodStats = (() => {
     if (!deals) return { count: 0, revenue: 0, avg: 0, tgs: 0 };
     if (period === "lifetime") {
       return { count: deals.totalDeals, revenue: deals.totalRevenue, avg: deals.avgDealSize, tgs: deals.tgsRevenue };
     }
-    // Sum revenue and TGS cut from the chart bars (guaranteed to match the visible chart)
-    const revenue = barData.reduce((s, d) => s + d.talentCut + d.tgsCut, 0);
-    const tgs = barData.reduce((s, d) => s + d.tgsCut, 0);
-    // Count deals whose wonDate maps into the current period's keys
-    const keys = new Set(Object.keys(periodMap[period]));
-    const count = deals.wonDeals.filter((d) => d.wonDate && keys.has(dateToKey(d.wonDate, period))).length;
+    const key = currentPeriodKey(period);
+    const slice = periodMap[period][key] ?? { talentCut: 0, tgsCut: 0 };
+    const revenue = slice.talentCut + slice.tgsCut;
+    const tgs = slice.tgsCut;
+    const count = deals.wonDeals.filter((d) => d.wonDate && dateToKey(d.wonDate, period) === key).length;
     return { count, revenue, avg: count > 0 ? Math.round(revenue / count) : 0, tgs };
   })();
 
@@ -238,12 +252,25 @@ export default function CreatorRevenueBoard({ creator, initialDeals }: { creator
             <h1 className="text-xl font-semibold text-gray-900">{creator.name}</h1>
             <p className="text-[12px] text-gray-400 mt-0.5">Revenue & Deal Analytics · Monday.com</p>
           </div>
-          <Link
-            href={`/creator/${creator.id}`}
-            className="text-[11px] text-gray-400 hover:text-gray-600 transition-colors border border-gray-200 rounded-lg px-3 py-1.5"
-          >
-            ← Analytics
-          </Link>
+          <div className="flex flex-col items-end gap-2">
+            <Link
+              href={`/creator/${creator.id}`}
+              className="text-[11px] text-gray-400 hover:text-gray-600 transition-colors border border-gray-200 rounded-lg px-3 py-1.5"
+            >
+              ← Analytics
+            </Link>
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden text-[10px] bg-white">
+              {(["lifetime", "year", "quarter", "month", "week"] as Period[]).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPeriod(p)}
+                  className={`px-2.5 py-1.5 transition-colors ${period === p ? "bg-gray-900 text-white" : "text-gray-400 hover:text-gray-600"}`}
+                >
+                  {PERIOD_LABELS[p]}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {loading && (
@@ -267,7 +294,7 @@ export default function CreatorRevenueBoard({ creator, initialDeals }: { creator
               <StatCard
                 label="Deals Closed"
                 value={String(periodStats.count)}
-                sub={period === "lifetime" ? "all time" : `this ${PERIOD_LABELS[period].toLowerCase()}`}
+                sub={period === "lifetime" ? "all time" : `${period === "quarter" ? "this quarter" : `this ${PERIOD_LABELS[period].toLowerCase()}`}`}
               />
               <StatCard label="Avg Deal Size" value={fmt(periodStats.avg)} sub="per deal" />
               <StatCard
@@ -279,31 +306,16 @@ export default function CreatorRevenueBoard({ creator, initialDeals }: { creator
 
             {/* Stacked bar chart */}
             <div className="bg-white rounded-xl border border-gray-100 p-5 mb-4">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-[12px] font-medium text-gray-700">Revenue Over Time</p>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="flex items-center gap-1 text-[10px] text-gray-500">
-                      <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: "#3ddc6e" }} />
-                      Creator (80%)
-                    </span>
-                    <span className="flex items-center gap-1 text-[10px] text-gray-500">
-                      <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: "#6366f1" }} />
-                      TGS (20%)
-                    </span>
-                  </div>
-                </div>
-                <div className="flex rounded-lg border border-gray-100 overflow-hidden text-[10px]">
-                  {(["lifetime", "year", "quarter", "month", "week"] as Period[]).map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => setPeriod(p)}
-                      className={`px-2.5 py-1 transition-colors ${period === p ? "bg-gray-900 text-white" : "text-gray-400 hover:text-gray-600"}`}
-                    >
-                      {PERIOD_LABELS[p]}
-                    </button>
-                  ))}
-                </div>
+              <div className="flex items-center gap-3 mb-4">
+                <p className="text-[12px] font-medium text-gray-700">Revenue Over Time</p>
+                <span className="flex items-center gap-1 text-[10px] text-gray-500">
+                  <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: "#3ddc6e" }} />
+                  Creator (80%)
+                </span>
+                <span className="flex items-center gap-1 text-[10px] text-gray-500">
+                  <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: "#6366f1" }} />
+                  TGS (20%)
+                </span>
               </div>
               <StackedBarChart data={barData} />
             </div>
