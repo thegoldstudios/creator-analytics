@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { fetchAllDeals, isWon, isActive, fmt, MondayDeal } from "@/lib/monday";
+import { fetchAllDeals, isWon, isActive, MondayDeal } from "@/lib/monday";
 import { getAllCreators } from "@/lib/creators-store";
 import { Agent } from "@/lib/types";
 import RevenueDashboard, { CreatorRevSummary } from "@/components/RevenueDashboard";
@@ -19,14 +19,18 @@ export default async function RevenuePage() {
     error = e instanceof Error ? e.message : "Failed to load";
   }
 
-  const creators = await getAllCreators();
-  // Map: normalised creator name → { id, agent }
-  const creatorByNorm: Record<string, { id: string; agent: Agent }> = {};
+  let creators: Awaited<ReturnType<typeof getAllCreators>> = [];
+  try {
+    creators = await getAllCreators();
+  } catch {}
+
+  // Map: norm(name) → { id, agent, photoUrl, avatar }
+  const creatorByNorm: Record<string, { id: string; agent: Agent; photoUrl?: string; avatar: string }> = {};
   for (const c of creators) {
-    creatorByNorm[norm(c.name)] = { id: c.id, agent: c.agent };
+    creatorByNorm[norm(c.name)] = { id: c.id, agent: c.agent, photoUrl: c.photoUrl, avatar: c.avatar };
   }
 
-  function matchCreator(talentName: string | null): { id: string; agent: Agent } | null {
+  function matchCreator(talentName: string | null) {
     if (!talentName) return null;
     const n = norm(talentName);
     for (const [key, val] of Object.entries(creatorByNorm)) {
@@ -35,7 +39,6 @@ export default async function RevenuePage() {
     return null;
   }
 
-  // Aggregate by talent profile
   const byTalent: Record<string, CreatorRevSummary> = {};
   for (const deal of deals) {
     const key = deal.talentProfileId ?? deal.talentName ?? "";
@@ -52,6 +55,8 @@ export default async function RevenuePage() {
         activeDeals: 0,
         creatorId: match?.id ?? null,
         agent: match?.agent ?? null,
+        photoUrl: match?.photoUrl ?? null,
+        avatar: match?.avatar ?? null,
       };
     }
     if (isWon(deal)) {
@@ -68,18 +73,5 @@ export default async function RevenuePage() {
     .map((s) => ({ ...s, avgDealSize: s.totalDeals > 0 ? Math.round(s.totalRevenue / s.totalDeals) : 0 }))
     .sort((a, b) => b.totalRevenue - a.totalRevenue || b.activeDeals - a.activeDeals);
 
-  const wonDeals = deals.filter(isWon);
-  const totalRevenue = wonDeals.reduce((s, d) => s + d.dealValue, 0);
-  const totalDeals = wonDeals.length;
-  const avgDealSize = totalDeals > 0 ? Math.round(totalRevenue / totalDeals) : 0;
-  const tgsRevenue = wonDeals.reduce((s, d) => s + d.tgsCut, 0);
-  const activeCount = deals.filter(isActive).length;
-
-  return (
-    <RevenueDashboard
-      summaries={summaries}
-      stats={{ totalDeals, totalRevenue: fmt(totalRevenue), avgDealSize: fmt(avgDealSize), tgsRevenue: fmt(tgsRevenue), activeCount }}
-      error={error}
-    />
-  );
+  return <RevenueDashboard summaries={summaries} error={error} />;
 }

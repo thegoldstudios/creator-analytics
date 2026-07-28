@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Footer from "@/components/Footer";
+import CreatorAvatar from "@/components/CreatorAvatar";
 import { Agent } from "@/lib/types";
 
 export interface CreatorRevSummary {
@@ -16,50 +17,55 @@ export interface CreatorRevSummary {
   activeDeals: number;
   creatorId: string | null;
   agent: Agent | null;
-}
-
-interface Stats {
-  totalDeals: number;
-  totalRevenue: string;
-  avgDealSize: string;
-  tgsRevenue: string;
-  activeCount: number;
+  photoUrl: string | null;
+  avatar: string | null;
 }
 
 interface Props {
   summaries: CreatorRevSummary[];
-  stats: Stats;
   error: string | null;
 }
 
 const AGENTS: (Agent | "All")[] = ["All", "Maddie", "Elicia", "Olivia", "Seth"];
 
-export default function RevenueDashboard({ summaries, stats, error }: Props) {
+function fmtNum(n: number) {
+  if (n >= 1_000_000) return `£${(n / 1_000_000).toFixed(1)}m`;
+  if (n >= 1_000) return `£${(n / 1_000).toFixed(1)}k`;
+  return `£${Math.round(n).toLocaleString()}`;
+}
+
+export default function RevenueDashboard({ summaries, error }: Props) {
   const [search, setSearch] = useState("");
   const [activeAgent, setActiveAgent] = useState<Agent | "All">("All");
 
-  const filtered = summaries.filter((s) => {
+  const filtered = useMemo(() => summaries.filter((s) => {
     const matchSearch = s.talentName.toLowerCase().includes(search.toLowerCase());
     const matchAgent = activeAgent === "All" || s.agent === activeAgent;
     return matchSearch && matchAgent;
-  });
+  }), [summaries, search, activeAgent]);
 
-  // Count per agent for badges
+  // Stats computed from the filtered set so they update with pod toggle
+  const stats = useMemo(() => {
+    const totalDeals = filtered.reduce((s, c) => s + c.totalDeals, 0);
+    const totalRevenue = filtered.reduce((s, c) => s + c.totalRevenue, 0);
+    const avgDealSize = totalDeals > 0 ? Math.round(totalRevenue / totalDeals) : 0;
+    const tgsRevenue = filtered.reduce((s, c) => s + c.tgsRevenue, 0);
+    const activeCount = filtered.reduce((s, c) => s + c.activeDeals, 0);
+    return { totalDeals, totalRevenue, avgDealSize, tgsRevenue, activeCount };
+  }, [filtered]);
+
   const agentCount = (agent: Agent | "All") =>
-    agent === "All"
-      ? summaries.length
-      : summaries.filter((s) => s.agent === agent).length;
+    agent === "All" ? summaries.length : summaries.filter((s) => s.agent === agent).length;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header — identical structure to analytics page */}
+      {/* Header */}
       <header className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center gap-4">
           <Image src="/tgs-logo.png" alt="The Gold Studios" width={28} height={28} className="object-contain shrink-0" />
           <span className="text-[13px] font-semibold text-gray-700 tracking-tight hidden sm:block">The Gold Studios</span>
           <span className="text-gray-200 hidden sm:block">|</span>
 
-          {/* Section tabs */}
           <nav className="flex items-center gap-1">
             <Link href="/" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors">
               Analytics
@@ -69,7 +75,6 @@ export default function RevenueDashboard({ summaries, stats, error }: Props) {
             </Link>
           </nav>
 
-          {/* Search bar — centre */}
           <div className="relative flex-1 max-w-xs mx-auto">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
@@ -91,7 +96,7 @@ export default function RevenueDashboard({ summaries, stats, error }: Props) {
       </header>
 
       <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-8">
-        {/* Agent / Pod filter tabs */}
+        {/* Pod filter tabs */}
         <div className="flex items-center gap-2 flex-wrap mb-7">
           {AGENTS.map((agent) => {
             const count = agentCount(agent);
@@ -125,15 +130,14 @@ export default function RevenueDashboard({ summaries, stats, error }: Props) {
           </div>
         ) : (
           <>
-            {/* 4 summary stat widgets */}
+            {/* Stats — update with pod filter */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-7">
               <StatWidget label="Deals Closed" value={String(stats.totalDeals)} sub="won + complete" />
-              <StatWidget label="Total Revenue" value={stats.totalRevenue} sub="creator earnings" />
-              <StatWidget label="Avg Deal Size" value={stats.avgDealSize} sub="per deal" />
-              <StatWidget label="TGS Commission" value={stats.tgsRevenue} sub={`${stats.activeCount} active leads`} />
+              <StatWidget label="Total Revenue" value={fmtNum(stats.totalRevenue)} sub="creator earnings" />
+              <StatWidget label="Avg Deal Size" value={fmtNum(stats.avgDealSize)} sub="per deal" />
+              <StatWidget label="TGS Commission" value={fmtNum(stats.tgsRevenue)} sub={`${stats.activeCount} active leads`} />
             </div>
 
-            {/* Creator cards */}
             {filtered.length === 0 ? (
               <div className="text-center py-24 text-gray-300 text-sm">
                 {search ? `No creators matching "${search}"` : `No creators in ${activeAgent}'s pod yet.`}
@@ -142,9 +146,9 @@ export default function RevenueDashboard({ summaries, stats, error }: Props) {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {filtered.map((s) => {
                   const href = s.creatorId ? `/creator/${s.creatorId}/revenue` : null;
+                  const initials = s.avatar ?? s.talentName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
                   const card = (
                     <div className="relative group bg-white rounded-2xl border border-gray-100 p-5 hover:border-gray-200 hover:shadow-sm transition-all cursor-pointer">
-                      {/* Chevron */}
                       {href && (
                         <div className="absolute top-4 right-4">
                           <svg className="w-4 h-4 text-gray-200 group-hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -153,20 +157,27 @@ export default function RevenueDashboard({ summaries, stats, error }: Props) {
                         </div>
                       )}
 
-                      {/* Name + agent */}
-                      <div className="mb-4 pr-6">
-                        <p className="text-[13px] font-semibold text-gray-900 truncate">{s.talentName}</p>
-                        {s.agent && (
-                          <p className="text-[11px] text-gray-400 mt-0.5">{s.agent}</p>
-                        )}
+                      {/* Avatar + name */}
+                      <div className="flex items-center gap-3 mb-4 pr-6">
+                        <div className="relative w-10 h-10 shrink-0">
+                          {s.photoUrl ? (
+                            <Image src={s.photoUrl} alt={s.talentName} fill className="object-cover rounded-full" unoptimized />
+                          ) : (
+                            <CreatorAvatar name={s.talentName} initials={initials} size="sm" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-semibold text-gray-900 truncate">{s.talentName}</p>
+                          {s.agent && <p className="text-[11px] text-gray-400">{s.agent}</p>}
+                        </div>
                       </div>
 
-                      {/* Stats grid — same 2×2 layout as analytics cards */}
+                      {/* Stats grid */}
                       <div className="grid grid-cols-2 gap-x-4 gap-y-3 pt-3.5 border-t border-gray-50">
-                        <Stat label="Avg Deal" value={s.avgDealSize > 0 ? `£${s.avgDealSize >= 1000 ? (s.avgDealSize / 1000).toFixed(1) + "k" : s.avgDealSize.toLocaleString()}` : "—"} />
-                        <Stat label="Revenue" value={s.totalRevenue > 0 ? `£${s.totalRevenue >= 1000 ? (s.totalRevenue / 1000).toFixed(1) + "k" : s.totalRevenue.toLocaleString()}` : "—"} />
+                        <Stat label="Avg Deal" value={s.avgDealSize > 0 ? fmtNum(s.avgDealSize) : "—"} />
+                        <Stat label="Revenue" value={s.totalRevenue > 0 ? fmtNum(s.totalRevenue) : "—"} />
                         <Stat label="Deals Won" value={String(s.totalDeals)} />
-                        <Stat label="TGS Cut" value={s.tgsRevenue > 0 ? `£${s.tgsRevenue >= 1000 ? (s.tgsRevenue / 1000).toFixed(1) + "k" : s.tgsRevenue.toLocaleString()}` : "—"} />
+                        <Stat label="TGS Cut" value={s.tgsRevenue > 0 ? fmtNum(s.tgsRevenue) : "—"} />
                       </div>
 
                       {s.activeDeals > 0 && (
