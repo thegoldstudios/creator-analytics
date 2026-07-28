@@ -27,32 +27,24 @@ export async function fetchAllDeals(): Promise<MondayDeal[]> {
   const token = process.env.MONDAY_API_TOKEN;
   if (!token) throw new Error("MONDAY_API_TOKEN not set");
 
-  // Use inline fragment on BoardRelationValue to get linked item names
+  // Query specific groups so we don't miss Won/Campaign Complete items
+  // (global items_page limit can cut off items in later groups)
+  const COLS = `["board_relation_mm0zyhyb","deal_stage","numeric_mkxn9km7","formula_mm3j815q","formula_mm3jf9q2","dropdown_mky8d1kf","date_mky8cdtj","color_mkth7qj"]`;
+  const ITEM_FRAGMENT = `
+    id name
+    group { id title }
+    column_values(ids: ${COLS}) {
+      id text value
+      ... on BoardRelationValue { linked_items { id name } }
+    }
+  `;
   const query = `
     query {
       boards(ids: [${BOARD_ID}]) {
-        items_page(limit: 500) {
-          items {
-            id
-            name
-            group { id title }
-            column_values(ids: [
-              "board_relation_mm0zyhyb",
-              "deal_stage",
-              "numeric_mkxn9km7",
-              "formula_mm3j815q",
-              "formula_mm3jf9q2",
-              "dropdown_mky8d1kf",
-              "date_mky8cdtj",
-              "color_mkth7qj"
-            ]) {
-              id
-              text
-              value
-              ... on BoardRelationValue {
-                linked_items { id name }
-              }
-            }
+        groups(ids: ["group_mkthf2s3","group_mkvk4h72","topics","closed","group_mktmffqg"]) {
+          id title
+          items_page(limit: 500) {
+            items { ${ITEM_FRAGMENT} }
           }
         }
       }
@@ -73,7 +65,10 @@ export async function fetchAllDeals(): Promise<MondayDeal[]> {
   const json = await res.json();
   if (json.errors) throw new Error(json.errors[0]?.message ?? "Monday GraphQL error");
 
-  const items: Record<string, unknown>[] = json?.data?.boards?.[0]?.items_page?.items ?? [];
+  // Flatten items from all groups
+  const groups: { items_page: { items: Record<string, unknown>[] } }[] =
+    json?.data?.boards?.[0]?.groups ?? [];
+  const items: Record<string, unknown>[] = groups.flatMap((g) => g.items_page?.items ?? []);
 
   return items.map((item): MondayDeal => {
     // Index column values by id
