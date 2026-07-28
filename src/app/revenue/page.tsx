@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { fetchAllDeals, isWon, isActive, MondayDeal } from "@/lib/monday";
+import { fetchAllDeals, fetchTalentProfiles, isWon, isActive, MondayDeal } from "@/lib/monday";
 import { getAllCreators } from "@/lib/creators-store";
 import { Agent } from "@/lib/types";
 import RevenueDashboard, { CreatorRevSummary } from "@/components/RevenueDashboard";
@@ -13,21 +13,30 @@ export default async function RevenuePage() {
   let deals: MondayDeal[] = [];
   let error: string | null = null;
 
-  try {
-    deals = await fetchAllDeals();
-  } catch (e) {
-    error = e instanceof Error ? e.message : "Failed to load";
+  // Fetch deals and talent profiles in parallel
+  const [dealsResult, profilesResult, creatorsResult] = await Promise.allSettled([
+    fetchAllDeals(),
+    fetchTalentProfiles(),
+    getAllCreators(),
+  ]);
+
+  if (dealsResult.status === "fulfilled") deals = dealsResult.value;
+  else error = dealsResult.reason instanceof Error ? dealsResult.reason.message : "Failed to load deals";
+
+  // Build talent profile map: id → { agent, status }
+  const profileMap: Record<string, { agent: string | null; status: string | null }> = {};
+  if (profilesResult.status === "fulfilled") {
+    for (const p of profilesResult.value) {
+      profileMap[p.id] = { agent: p.agent, status: p.status };
+    }
   }
 
-  let creators: Awaited<ReturnType<typeof getAllCreators>> = [];
-  try {
-    creators = await getAllCreators();
-  } catch {}
-
-  // Map: norm(name) → { id, agent, photoUrl, avatar }
-  const creatorByNorm: Record<string, { id: string; agent: Agent; photoUrl?: string; avatar: string }> = {};
-  for (const c of creators) {
-    creatorByNorm[norm(c.name)] = { id: c.id, agent: c.agent, photoUrl: c.photoUrl, avatar: c.avatar };
+  // Build creator map for photos: norm(name) → { id, photoUrl, avatar }
+  const creatorByNorm: Record<string, { id: string; photoUrl?: string; avatar: string }> = {};
+  if (creatorsResult.status === "fulfilled") {
+    for (const c of creatorsResult.value) {
+      creatorByNorm[norm(c.name)] = { id: c.id, photoUrl: c.photoUrl, avatar: c.avatar };
+    }
   }
 
   function matchCreator(talentName: string | null) {
@@ -40,10 +49,13 @@ export default async function RevenuePage() {
   }
 
   const byTalent: Record<string, CreatorRevSummary> = {};
+
   for (const deal of deals) {
     const key = deal.talentProfileId ?? deal.talentName ?? "";
     if (!key) continue;
+
     if (!byTalent[key]) {
+      const profile = deal.talentProfileId ? profileMap[deal.talentProfileId] : null;
       const match = matchCreator(deal.talentName);
       byTalent[key] = {
         talentProfileId: key,
@@ -53,15 +65,15 @@ export default async function RevenuePage() {
         avgDealSize: 0,
         tgsRevenue: 0,
         activeDeals: 0,
+        // Agent comes from Monday Talent Profiles board — authoritative
+        agent: (profile?.agent ?? null) as Agent | null,
+        talentStatus: profile?.status ?? null,
         creatorId: match?.id ?? null,
-        agent: match?.agent ?? null,
         photoUrl: match?.photoUrl ?? null,
         avatar: match?.avatar ?? null,
-        priority: deal.priority,
       };
     }
-    // Update priority from the most recent deal that has one
-    if (deal.priority) byTalent[key].priority = deal.priority;
+
     if (isWon(deal)) {
       byTalent[key].totalDeals++;
       byTalent[key].totalRevenue += deal.dealValue;

@@ -9,7 +9,6 @@ export interface MondayDeal {
   talentName: string | null;
   talentProfileId: string | null;
   stage: string;
-  priority: string | null;
   dealValue: number;
   platforms: string[];
   wonDate: string | null;
@@ -30,7 +29,7 @@ export async function fetchAllDeals(): Promise<MondayDeal[]> {
 
   // Query specific groups so we don't miss Won/Campaign Complete items
   // (global items_page limit can cut off items in later groups)
-  const COLS = `["board_relation_mm0zyhyb","deal_stage","numeric_mkxn9km7","formula_mm3j815q","formula_mm3jf9q2","dropdown_mky8d1kf","date_mky8cdtj","color_mkth7qj","status9"]`;
+  const COLS = `["board_relation_mm0zyhyb","deal_stage","numeric_mkxn9km7","formula_mm3j815q","formula_mm3jf9q2","dropdown_mky8d1kf","date_mky8cdtj","color_mkth7qj"]`;
   const ITEM_FRAGMENT = `
     id name
     group { id title }
@@ -98,13 +97,82 @@ export async function fetchAllDeals(): Promise<MondayDeal[]> {
       talentName,
       talentProfileId,
       stage: cols["deal_stage"]?.text ?? "Unknown",
-      priority: cols["status9"]?.text || null,
       dealValue,
       platforms,
       wonDate: cols["date_mky8cdtj"]?.text ?? null,
       dealType: cols["color_mkth7qj"]?.text ?? "",
       talentCut,
       tgsCut,
+    };
+  });
+}
+
+const TALENT_BOARD_ID = 2110287888;
+
+// Map agent full name → our Agent type
+const AGENT_MAP: Record<string, string> = {
+  "Maddie Warn": "Maddie",
+  "Elicia Jones": "Elicia",
+  "Olivia Scenna": "Olivia",
+  "Seth Klein": "Seth",
+};
+
+function parseAgent(text: string | null): string | null {
+  if (!text) return null;
+  for (const [full, short] of Object.entries(AGENT_MAP)) {
+    if (text.includes(full)) return short;
+  }
+  return null;
+}
+
+export interface TalentProfile {
+  id: string;
+  name: string;
+  agent: string | null;
+  status: string | null; // Happy, Urgent, Push, Leaving, etc.
+}
+
+export async function fetchTalentProfiles(): Promise<TalentProfile[]> {
+  const token = process.env.MONDAY_API_TOKEN;
+  if (!token) throw new Error("MONDAY_API_TOKEN not set");
+
+  const query = `
+    query {
+      boards(ids: [${TALENT_BOARD_ID}]) {
+        items_page(limit: 500) {
+          items {
+            id name
+            column_values(ids: ["multiple_person_mkv1k4m1", "color_mm4f23s4"]) {
+              id text
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const res = await fetch(MONDAY_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: token },
+    body: JSON.stringify({ query }),
+    cache: "no-store",
+  });
+
+  if (!res.ok) throw new Error(`Monday API ${res.status}`);
+  const json = await res.json();
+  if (json.errors) throw new Error(json.errors[0]?.message ?? "Monday GraphQL error");
+
+  const items: Record<string, unknown>[] = json?.data?.boards?.[0]?.items_page?.items ?? [];
+  return items.map((item): TalentProfile => {
+    const cols: Record<string, string | null> = {};
+    for (const cv of item.column_values as { id: string; text: string | null }[]) {
+      cols[cv.id] = cv.text ?? null;
+    }
+    return {
+      id: item.id as string,
+      name: item.name as string,
+      agent: parseAgent(cols["multiple_person_mkv1k4m1"]),
+      status: cols["color_mm4f23s4"] ?? null,
     };
   });
 }

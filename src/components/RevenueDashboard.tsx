@@ -19,7 +19,7 @@ export interface CreatorRevSummary {
   agent: Agent | null;
   photoUrl: string | null;
   avatar: string | null;
-  priority: string | null;
+  talentStatus: string | null;
 }
 
 interface Props {
@@ -179,10 +179,10 @@ export default function RevenueDashboard({ summaries, error }: Props) {
                         <Stat label="Revenue" value={s.totalRevenue > 0 ? fmtNum(s.totalRevenue) : "—"} />
                         <Stat label="Deals Won" value={String(s.totalDeals)} />
                         <div>
-                          <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Priority</p>
-                          {s.priority ? (
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${priorityColor(s.priority)}`}>
-                              {s.priority}
+                          <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Status</p>
+                          {s.talentStatus ? (
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusColor(s.talentStatus)}`}>
+                              {s.talentStatus}
                             </span>
                           ) : (
                             <p className="text-[15px] font-semibold text-gray-900">—</p>
@@ -215,13 +215,15 @@ export default function RevenueDashboard({ summaries, error }: Props) {
   );
 }
 
-function priorityColor(p: string): string {
-  const l = p.toLowerCase();
+function statusColor(s: string): string {
+  const l = s.toLowerCase();
   if (l.includes("urgent")) return "bg-red-100 text-red-600";
-  if (l.includes("high")) return "bg-orange-100 text-orange-600";
   if (l.includes("push")) return "bg-yellow-100 text-yellow-700";
-  if (l.includes("medium")) return "bg-blue-100 text-blue-600";
-  if (l.includes("low")) return "bg-gray-100 text-gray-500";
+  if (l.includes("leav")) return "bg-orange-100 text-orange-600";
+  if (l.includes("happy")) return "bg-emerald-100 text-emerald-700";
+  if (l.includes("unhappy")) return "bg-red-50 text-red-500";
+  if (l.includes("static")) return "bg-amber-100 text-amber-700";
+  if (l.includes("new")) return "bg-gray-100 text-gray-500";
   return "bg-gray-100 text-gray-600";
 }
 
