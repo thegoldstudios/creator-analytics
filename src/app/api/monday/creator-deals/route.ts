@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     const activeDeals = deals.filter(isActive);
 
     const totalDeals = wonDeals.length;
-    const totalRevenue = wonDeals.reduce((s, d) => s + d.convertedValueGBP, 0);
+    const totalRevenue = wonDeals.reduce((s, d) => s + d.dealValue, 0);
     const avgDealSize = totalDeals > 0 ? Math.round(totalRevenue / totalDeals) : 0;
     const tgsRevenue = wonDeals.reduce((s, d) => s + d.tgsCut, 0);
 
@@ -89,7 +89,7 @@ export async function GET(req: NextRequest) {
         name: d.name,
         url: d.url,
         stage: d.stage,
-        dealValue: d.convertedValueGBP,
+        dealValue: d.dealValue,
         platforms: d.platforms,
         dealType: d.dealType,
         group: d.group.title,
@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
         name: d.name,
         url: d.url,
         stage: d.stage,
-        dealValue: d.convertedValueGBP,
+        dealValue: d.dealValue,
         platforms: d.platforms,
         dealType: d.dealType,
         wonDate: d.wonDate,

@@ -5,7 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import CreatorAvatar from "@/components/CreatorAvatar";
 import Footer from "@/components/Footer";
-import SalesSection from "@/components/SalesSection";
 import { formatNum } from "@/lib/mock-data";
 import { Agent, Creator, Platform } from "@/lib/types";
 
@@ -178,6 +177,12 @@ export default function RosterPage() {
           </div>
 
           <div className="ml-auto flex items-center gap-3">
+            <Link
+              href="/revenue"
+              className="px-3 py-1.5 rounded-lg border border-gray-200 text-[13px] font-medium text-gray-600 hover:border-gray-400 hover:text-gray-900 transition-colors"
+            >
+              Revenue
+            </Link>
             <button
               onClick={openAdd}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-[13px] font-medium hover:bg-gray-700 transition-colors"
@@ -319,8 +324,6 @@ export default function RosterPage() {
           </div>
         )}
       </div>
-
-      <SalesSection creatorIdMap={Object.fromEntries(creators.map((c) => [c.name, c.id]))} />
 
       {/* Add / Edit Modal */}
       {modal && (

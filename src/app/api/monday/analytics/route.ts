@@ -9,7 +9,7 @@ export async function GET() {
     const activeDeals = deals.filter(isActive);
 
     const totalDeals = wonDeals.length;
-    const totalRevenue = wonDeals.reduce((s, d) => s + d.convertedValueGBP, 0);
+    const totalRevenue = wonDeals.reduce((s, d) => s + d.dealValue, 0);
     const avgDealSize = totalDeals > 0 ? Math.round(totalRevenue / totalDeals) : 0;
     const tgsRevenue = wonDeals.reduce((s, d) => s + d.tgsCut, 0);
 
@@ -35,7 +35,7 @@ export async function GET() {
         };
       }
       if (isWon(deal)) {
-        byCreator[key].totalRevenue += deal.convertedValueGBP;
+        byCreator[key].totalRevenue += deal.dealValue;
         byCreator[key].totalDeals++;
       }
       if (isActive(deal)) {

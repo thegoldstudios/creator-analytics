@@ -246,12 +246,20 @@ export default function CreatorRevenueBoard({ creator }: { creator: Creator }) {
             <h1 className="text-xl font-semibold text-gray-900">{creator.name}</h1>
             <p className="text-[12px] text-gray-400 mt-0.5">Revenue & Deal Analytics · Monday.com</p>
           </div>
+          <div className="flex items-center gap-2">
           <Link
             href={`/creator/${creator.id}`}
             className="text-[11px] text-gray-400 hover:text-gray-600 transition-colors border border-gray-200 rounded-lg px-3 py-1.5"
           >
             ← Analytics
           </Link>
+          <Link
+            href="/revenue"
+            className="text-[11px] text-gray-400 hover:text-gray-600 transition-colors border border-gray-200 rounded-lg px-3 py-1.5"
+          >
+            All Revenue
+          </Link>
+        </div>
         </div>
 
         {loading && (
