@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { fetchAllDeals, fetchTalentProfiles, isWon, isActive, MondayDeal } from "@/lib/monday";
+import { fetchAllDeals, fetchTalentProfiles, isWon, isActive, MondayDeal, EXCLUDED_TALENT_GROUPS } from "@/lib/monday";
 import { getAllCreators } from "@/lib/creators-store";
 import { Agent } from "@/lib/types";
 import RevenueDashboard, { CreatorRevSummary } from "@/components/RevenueDashboard";
@@ -55,9 +55,9 @@ export default async function RevenuePage() {
     }
   }
 
-  // Build summaries from ALL talent profiles (not just those with deals)
+  // Build summaries from talent profiles, excluding unwanted groups
   const summaries: CreatorRevSummary[] = profiles
-    .filter((p) => p.agent !== null) // only show managed talent
+    .filter((p) => p.agent !== null && !EXCLUDED_TALENT_GROUPS.has(p.group.toLowerCase()))
     .map((p): CreatorRevSummary => {
       const d = dealsByProfile[p.id] ?? { totalDeals: 0, totalRevenue: 0, tgsRevenue: 0, activeDeals: 0 };
       const match = matchCreator(p.name);

@@ -133,9 +133,19 @@ function parseAgent(text: string | null): string | null {
 export interface TalentProfile {
   id: string;
   name: string;
+  group: string; // group title from Monday
   agent: string | null;
   status: string | null; // Happy, Urgent, Push, Leaving, etc.
 }
+
+// Groups to exclude from the Revenue page
+export const EXCLUDED_TALENT_GROUPS = new Set([
+  "previous creator clients",
+  "other",
+  "others",
+  "gold arena uk",
+  "gold arena us",
+]);
 
 async function _fetchTalentProfiles(): Promise<TalentProfile[]> {
   const token = process.env.MONDAY_API_TOKEN;
@@ -144,11 +154,14 @@ async function _fetchTalentProfiles(): Promise<TalentProfile[]> {
   const query = `
     query {
       boards(ids: [${TALENT_BOARD_ID}]) {
-        items_page(limit: 500) {
-          items {
-            id name
-            column_values(ids: ["multiple_person_mkv1k4m1", "color_mm4f23s4"]) {
-              id text
+        groups {
+          id title
+          items_page(limit: 500) {
+            items {
+              id name
+              column_values(ids: ["multiple_person_mkv1k4m1", "color_mm4f23s4"]) {
+                id text
+              }
             }
           }
         }
@@ -167,19 +180,26 @@ async function _fetchTalentProfiles(): Promise<TalentProfile[]> {
   const json = await res.json();
   if (json.errors) throw new Error(json.errors[0]?.message ?? "Monday GraphQL error");
 
-  const items: Record<string, unknown>[] = json?.data?.boards?.[0]?.items_page?.items ?? [];
-  return items.map((item): TalentProfile => {
-    const cols: Record<string, string | null> = {};
-    for (const cv of item.column_values as { id: string; text: string | null }[]) {
-      cols[cv.id] = cv.text ?? null;
+  const groups: { id: string; title: string; items_page: { items: Record<string, unknown>[] } }[] =
+    json?.data?.boards?.[0]?.groups ?? [];
+
+  const profiles: TalentProfile[] = [];
+  for (const group of groups) {
+    for (const item of group.items_page?.items ?? []) {
+      const cols: Record<string, string | null> = {};
+      for (const cv of item.column_values as { id: string; text: string | null }[]) {
+        cols[cv.id] = cv.text ?? null;
+      }
+      profiles.push({
+        id: item.id as string,
+        name: item.name as string,
+        group: group.title,
+        agent: parseAgent(cols["multiple_person_mkv1k4m1"]),
+        status: cols["color_mm4f23s4"] ?? null,
+      });
     }
-    return {
-      id: item.id as string,
-      name: item.name as string,
-      agent: parseAgent(cols["multiple_person_mkv1k4m1"]),
-      status: cols["color_mm4f23s4"] ?? null,
-    };
-  });
+  }
+  return profiles;
 }
 
 export const fetchTalentProfiles = unstable_cache(_fetchTalentProfiles, ["monday-talent-profiles"], { revalidate: 300 });
