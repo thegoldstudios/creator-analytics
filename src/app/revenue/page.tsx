@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { fetchAllDeals, isWon, isActive, fmt, MondayDeal } from "@/lib/monday";
 import { getAllCreators } from "@/lib/creators-store";
 import { Agent } from "@/lib/types";
