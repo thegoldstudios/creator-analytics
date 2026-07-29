@@ -146,17 +146,17 @@ export default function RevenueDashboard({ summaries, error }: Props) {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {filtered.map((s) => {
-                  const href = s.creatorId ? `/creator/${s.creatorId}/revenue` : null;
+                  const href = s.creatorId
+                    ? `/creator/${s.creatorId}/revenue`
+                    : `/revenue/talent/${s.talentProfileId}`;
                   const initials = s.avatar ?? s.talentName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
                   const card = (
                     <div className="relative group bg-white rounded-2xl border border-gray-100 p-5 hover:border-gray-200 hover:shadow-sm transition-all cursor-pointer">
-                      {href && (
-                        <div className="absolute top-4 right-4">
-                          <svg className="w-4 h-4 text-gray-200 group-hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                          </svg>
-                        </div>
-                      )}
+                      <div className="absolute top-4 right-4">
+                        <svg className="w-4 h-4 text-gray-200 group-hover:text-gray-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
 
                       {/* Avatar + name */}
                       <div className="flex items-center gap-3 mb-4 pr-6">
@@ -202,11 +202,7 @@ export default function RevenueDashboard({ summaries, error }: Props) {
                     </div>
                   );
 
-                  return href ? (
-                    <Link key={s.talentProfileId} href={href}>{card}</Link>
-                  ) : (
-                    <div key={s.talentProfileId}>{card}</div>
-                  );
+                  return <Link key={s.talentProfileId} href={href}>{card}</Link>;
                 })}
               </div>
             )}

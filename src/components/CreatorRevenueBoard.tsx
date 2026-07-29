@@ -180,7 +180,7 @@ function SortBtn({ active, dir, onClick }: { active: boolean; dir: SortDir; onCl
   );
 }
 
-export default function CreatorRevenueBoard({ creator, initialDeals }: { creator: Creator; initialDeals: CreatorDeals | null }) {
+export default function CreatorRevenueBoard({ creator, initialDeals, backUrl }: { creator: Creator; initialDeals: CreatorDeals | null; backUrl?: string }) {
   const [deals] = useState<CreatorDeals | null>(initialDeals);
   const error = initialDeals === null ? "No deal data found" : null;
   const [period, setPeriod] = useState<Period>("month");
@@ -286,12 +286,14 @@ export default function CreatorRevenueBoard({ creator, initialDeals }: { creator
             </div>
           </div>
           <div className="flex flex-col items-end gap-2">
-            <Link
-              href={`/creator/${creator.id}`}
-              className="text-[11px] text-gray-400 hover:text-gray-600 transition-colors border border-gray-200 rounded-lg px-3 py-1.5"
-            >
-              ← Analytics
-            </Link>
+            {creator.id && (
+              <Link
+                href={`/creator/${creator.id}`}
+                className="text-[11px] text-gray-400 hover:text-gray-600 transition-colors border border-gray-200 rounded-lg px-3 py-1.5"
+              >
+                ← Analytics
+              </Link>
+            )}
             <div className="flex rounded-lg border border-gray-200 overflow-hidden text-[10px] bg-white">
               {(["lifetime", "year", "quarter", "month", "week"] as Period[]).map((p) => (
                 <button

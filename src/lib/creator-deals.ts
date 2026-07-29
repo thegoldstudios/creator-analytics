@@ -1,4 +1,4 @@
-import { fetchAllDeals, isWon, isActive } from "@/lib/monday";
+import { fetchAllDeals, isWon, isActive, MondayDeal } from "@/lib/monday";
 
 function norm(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -33,16 +33,7 @@ export interface CreatorDeals {
   wonDeals: DealItem[];
 }
 
-export async function getCreatorDeals(talentName: string): Promise<CreatorDeals> {
-  const all = await fetchAllDeals();
-  const normTarget = norm(talentName);
-
-  const deals = all.filter((d) => {
-    if (!d.talentName) return false;
-    const n = norm(d.talentName);
-    return n.includes(normTarget) || normTarget.includes(n);
-  });
-
+function _aggregate(deals: MondayDeal[]): CreatorDeals {
   const wonDeals = deals.filter(isWon);
   const activeDeals = deals.filter(isActive);
 
@@ -112,4 +103,20 @@ export async function getCreatorDeals(talentName: string): Promise<CreatorDeals>
       wonDate: d.wonDate ?? undefined, group: d.group.title,
     })),
   };
+}
+
+export async function getCreatorDealsByProfileId(talentProfileId: string): Promise<CreatorDeals> {
+  const all = await fetchAllDeals();
+  return _aggregate(all.filter((d) => d.talentProfileId === talentProfileId));
+}
+
+export async function getCreatorDeals(talentName: string): Promise<CreatorDeals> {
+  const all = await fetchAllDeals();
+  const normTarget = norm(talentName);
+  const deals = all.filter((d) => {
+    if (!d.talentName) return false;
+    const n = norm(d.talentName);
+    return n.includes(normTarget) || normTarget.includes(n);
+  });
+  return _aggregate(deals);
 }

@@ -29,14 +29,12 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
   const token = process.env.MONDAY_API_TOKEN;
   if (!token) throw new Error("MONDAY_API_TOKEN not set");
 
-  // Query specific groups so we don't miss Won/Campaign Complete items
-  // (global items_page limit can cut off items in later groups)
-  const COLS = `["board_relation_mm0zyhyb","deal_stage","numeric_mkxn9km7","formula_mm3j815q","formula_mm3jf9q2","dropdown_mky8d1kf","date_mky8cdtj","color_mkth7qj"]`;
+  // Fetch all column values so we can find "Converted Value £" by title
   const ITEM_FRAGMENT = `
     id name
     group { id title }
-    column_values(ids: ${COLS}) {
-      id text value
+    column_values {
+      id title text value
       ... on BoardRelationValue { linked_items { id name } }
     }
   `;
@@ -75,8 +73,10 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
   return items.map((item): MondayDeal => {
     // Index column values by id
     const cols: Record<string, { text: string | null; value: string | null; linked_items?: { id: string; name: string }[] }> = {};
-    for (const cv of item.column_values as { id: string; text: string | null; value: string | null; linked_items?: { id: string; name: string }[] }[]) {
+    const colsByTitle: Record<string, { text: string | null }> = {};
+    for (const cv of item.column_values as { id: string; title: string; text: string | null; value: string | null; linked_items?: { id: string; name: string }[] }[]) {
       cols[cv.id] = cv;
+      colsByTitle[cv.title?.toLowerCase() ?? ""] = cv;
     }
 
     const talentLinked = cols["board_relation_mm0zyhyb"]?.linked_items?.[0] ?? null;
@@ -87,7 +87,10 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
       ? cols["dropdown_mky8d1kf"]!.text!.split(",").map((s) => s.trim()).filter(Boolean)
       : [];
 
-    const dealValue = parseNum(cols["numeric_mkxn9km7"]?.text);
+    // Use "Converted Value £" (GBP-normalised), falling back to raw Deal Value
+    const convertedValue = parseNum(colsByTitle["converted value £"]?.text ?? colsByTitle["converted value"]?.text);
+    const rawDealValue = parseNum(cols["numeric_mkxn9km7"]?.text);
+    const dealValue = convertedValue > 0 ? convertedValue : rawDealValue;
     const tgsCut = parseNum(cols["formula_mm3j815q"]?.text) || Math.round(dealValue * 0.2);
     const talentCut = parseNum(cols["formula_mm3jf9q2"]?.text) || Math.round(dealValue * 0.8);
 
@@ -98,10 +101,10 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
       group: item.group as { id: string; title: string },
       talentName,
       talentProfileId,
-      stage: cols["deal_stage"]?.text ?? "Unknown",
+      stage: cols["deal_stage"]?.text ?? colsByTitle["deal stage"]?.text ?? "Unknown",
       dealValue,
       platforms,
-      wonDate: cols["date_mky8cdtj"]?.text ?? null,
+      wonDate: cols["date_mky8cdtj"]?.text ?? colsByTitle["won date"]?.text ?? colsByTitle["date"]?.text ?? null,
       dealType: cols["color_mkth7qj"]?.text ?? "",
       talentCut,
       tgsCut,
