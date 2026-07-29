@@ -1,5 +1,5 @@
 export type Platform = "tiktok" | "instagram" | "youtube_shorts" | "youtube_longform";
-export type Agent = "Maddie" | "Elicia" | "Olivia" | "Seth";
+export type Agent = "Maddie" | "Elicia" | "Olivia" | "Seth" | "Kelvin" | "Emerson";
 
 export interface DemographicBar {
   label: string;

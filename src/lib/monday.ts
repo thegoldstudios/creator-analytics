@@ -141,11 +141,12 @@ export interface TalentProfile {
   status: string | null; // Happy, Urgent, Push, Leaving, etc.
 }
 
-// Groups to exclude from the Revenue page
-export const EXCLUDED_TALENT_GROUPS = new Set([
-  "previous creator clients",
-  "other",
-  "others",
+// Only these groups from the Talent Profiles board appear on the Revenue page
+export const ALLOWED_TALENT_GROUPS = new Set([
+  "gold talent uk - pod a",
+  "gold talent uk - pod b",
+  "gold talent us - pod a",
+  "gold talent us - pod b",
   "gold arena uk",
   "gold arena us",
 ]);
@@ -193,11 +194,16 @@ async function _fetchTalentProfiles(): Promise<TalentProfile[]> {
       for (const cv of item.column_values as { id: string; text: string | null }[]) {
         cols[cv.id] = cv.text ?? null;
       }
+      const groupLower = group.title.toLowerCase();
+      let agent = parseAgent(cols["multiple_person_mkv1k4m1"]);
+      // Gold Arena managers aren't in the person column — derive from group
+      if (!agent && groupLower.includes("gold arena uk")) agent = "Kelvin";
+      if (!agent && groupLower.includes("gold arena us")) agent = "Emerson";
       profiles.push({
         id: item.id as string,
         name: item.name as string,
         group: group.title,
-        agent: parseAgent(cols["multiple_person_mkv1k4m1"]),
+        agent,
         status: cols["color_mm4f23s4"] ?? null,
       });
     }
