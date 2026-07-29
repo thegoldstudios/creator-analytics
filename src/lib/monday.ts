@@ -29,18 +29,18 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
   const token = process.env.MONDAY_API_TOKEN;
   if (!token) throw new Error("MONDAY_API_TOKEN not set");
 
-  // Fetch all column values so we can find "Converted Value £" by title
   const ITEM_FRAGMENT = `
     id name
     group { id title }
     column_values {
-      id title text value
+      id text value
       ... on BoardRelationValue { linked_items { id name } }
     }
   `;
   const query = `
     query {
       boards(ids: [${BOARD_ID}]) {
+        columns { id title }
         groups(ids: ["group_mkthf2s3","group_mkvk4h72","topics","closed","group_mktmffqg"]) {
           id title
           items_page(limit: 500) {
@@ -65,18 +65,24 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
   const json = await res.json();
   if (json.errors) throw new Error(json.errors[0]?.message ?? "Monday GraphQL error");
 
+  const board = json?.data?.boards?.[0];
+
+  // Build a title→id map from board column definitions
+  const boardColumns: { id: string; title: string }[] = board?.columns ?? [];
+  const colIdByTitle: Record<string, string> = {};
+  for (const col of boardColumns) {
+    colIdByTitle[col.title.toLowerCase()] = col.id;
+  }
+  const convertedValueColId = colIdByTitle["converted value £"] ?? colIdByTitle["converted value"] ?? null;
+
   // Flatten items from all groups
-  const groups: { items_page: { items: Record<string, unknown>[] } }[] =
-    json?.data?.boards?.[0]?.groups ?? [];
+  const groups: { items_page: { items: Record<string, unknown>[] } }[] = board?.groups ?? [];
   const items: Record<string, unknown>[] = groups.flatMap((g) => g.items_page?.items ?? []);
 
   return items.map((item): MondayDeal => {
-    // Index column values by id
     const cols: Record<string, { text: string | null; value: string | null; linked_items?: { id: string; name: string }[] }> = {};
-    const colsByTitle: Record<string, { text: string | null }> = {};
-    for (const cv of item.column_values as { id: string; title: string; text: string | null; value: string | null; linked_items?: { id: string; name: string }[] }[]) {
+    for (const cv of item.column_values as { id: string; text: string | null; value: string | null; linked_items?: { id: string; name: string }[] }[]) {
       cols[cv.id] = cv;
-      colsByTitle[cv.title?.toLowerCase() ?? ""] = cv;
     }
 
     const talentLinked = cols["board_relation_mm0zyhyb"]?.linked_items?.[0] ?? null;
@@ -87,8 +93,8 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
       ? cols["dropdown_mky8d1kf"]!.text!.split(",").map((s) => s.trim()).filter(Boolean)
       : [];
 
-    // Use "Converted Value £" (GBP-normalised), falling back to raw Deal Value
-    const convertedValue = parseNum(colsByTitle["converted value £"]?.text ?? colsByTitle["converted value"]?.text);
+    // Prefer "Converted Value £" (GBP-normalised); fall back to raw Deal Value
+    const convertedValue = convertedValueColId ? parseNum(cols[convertedValueColId]?.text) : 0;
     const rawDealValue = parseNum(cols["numeric_mkxn9km7"]?.text);
     const dealValue = convertedValue > 0 ? convertedValue : rawDealValue;
     const tgsCut = parseNum(cols["formula_mm3j815q"]?.text) || Math.round(dealValue * 0.2);
@@ -101,10 +107,10 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
       group: item.group as { id: string; title: string },
       talentName,
       talentProfileId,
-      stage: cols["deal_stage"]?.text ?? colsByTitle["deal stage"]?.text ?? "Unknown",
+      stage: cols["deal_stage"]?.text ?? "Unknown",
       dealValue,
       platforms,
-      wonDate: cols["date_mky8cdtj"]?.text ?? colsByTitle["won date"]?.text ?? colsByTitle["date"]?.text ?? null,
+      wonDate: cols["date_mky8cdtj"]?.text ?? null,
       dealType: cols["color_mkth7qj"]?.text ?? "",
       talentCut,
       tgsCut,
