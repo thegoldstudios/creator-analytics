@@ -133,10 +133,10 @@ export default function RevenueDashboard({ summaries, error }: Props) {
           <>
             {/* Stats — update with pod filter */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-7">
-              <StatWidget label="Deals Closed" value={String(stats.totalDeals)} sub="won + complete" />
-              <StatWidget label="Total Revenue" value={fmtNum(stats.totalRevenue)} sub="creator earnings" />
+              <StatWidget label="Deals Signed & Underway" value={String(stats.totalDeals)} sub="won + complete" />
+              <StatWidget label="Total Revenue" value={fmtNum(stats.totalRevenue)} sub="all time" />
               <StatWidget label="Avg Deal Size" value={fmtNum(stats.avgDealSize)} sub="per deal" />
-              <StatWidget label="TGS Commission" value={fmtNum(stats.tgsRevenue)} sub={`${stats.activeCount} active leads`} />
+              <StatWidget label="Active Leads" value={String(stats.activeCount)} sub="in pipeline now" accent />
             </div>
 
             {filtered.length === 0 ? (
@@ -191,9 +191,13 @@ export default function RevenueDashboard({ summaries, error }: Props) {
                       </div>
 
                       {s.activeDeals > 0 && (
-                        <p className="text-[10px] text-gray-400 mt-3 pt-3 border-t border-gray-50">
-                          {s.activeDeals} active lead{s.activeDeals !== 1 ? "s" : ""} in pipeline
-                        </p>
+                        <div className="mt-3 pt-3 border-t border-gray-50 flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                          <span className="text-[11px] font-semibold text-emerald-700">
+                            {s.activeDeals} active lead{s.activeDeals !== 1 ? "s" : ""}
+                          </span>
+                          <span className="text-[10px] text-gray-400">in pipeline</span>
+                        </div>
                       )}
                     </div>
                   );
@@ -227,12 +231,12 @@ function statusColor(s: string): string {
   return "bg-gray-100 text-gray-600";
 }
 
-function StatWidget({ label, value, sub }: { label: string; value: string; sub: string }) {
+function StatWidget({ label, value, sub, accent }: { label: string; value: string; sub: string; accent?: boolean }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-4">
-      <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1">{label}</p>
-      <p className="text-xl font-semibold text-gray-900 tabular-nums">{value}</p>
-      <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>
+    <div className={`rounded-xl border p-4 ${accent ? "bg-emerald-50 border-emerald-100" : "bg-white border-gray-100"}`}>
+      <p className={`text-[10px] font-medium uppercase tracking-wide mb-1 ${accent ? "text-emerald-600" : "text-gray-400"}`}>{label}</p>
+      <p className={`text-xl font-semibold tabular-nums ${accent ? "text-emerald-700" : "text-gray-900"}`}>{value}</p>
+      <p className={`text-[10px] mt-0.5 ${accent ? "text-emerald-500" : "text-gray-400"}`}>{sub}</p>
     </div>
   );
 }
