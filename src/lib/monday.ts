@@ -87,10 +87,9 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
       ? cols["dropdown_mky8d1kf"]!.text!.split(",").map((s) => s.trim()).filter(Boolean)
       : [];
 
-    // Prefer "Converted Value £" formula column; fall back to raw Deal Value
-    // Formula columns expose computed result in `value`, not `text`
-    const convertedRaw = cols[CONVERTED_VALUE_COL];
-    const convertedValue = parseNum(convertedRaw?.value ?? convertedRaw?.text);
+    // "Converted Value £" is a formula column — computed result is in `text`, not `value`
+    // (`value` stores the raw cell state as "0"; using it causes wrong fallback)
+    const convertedValue = parseNum(cols[CONVERTED_VALUE_COL]?.text);
     const rawDealValue = parseNum(cols["numeric_mkxn9km7"]?.text);
     const dealValue = convertedValue > 0 ? convertedValue : rawDealValue;
     const tgsCut = parseNum(cols["formula_mm3j815q"]?.text) || Math.round(dealValue * 0.2);
