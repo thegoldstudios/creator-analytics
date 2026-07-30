@@ -35,7 +35,6 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
     column_values {
       id text value
       ... on BoardRelationValue { linked_items { id name } }
-      ... on FormulaValue { value }
     }
   `;
   const query = `
@@ -114,7 +113,7 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
 }
 
 // Cache Monday data for 5 minutes so repeated page loads don't all hit the API
-export const fetchAllDeals = unstable_cache(_fetchAllDeals, ["monday-deals"], { revalidate: 300 });
+export const fetchAllDeals = unstable_cache(_fetchAllDeals, ["monday-deals-v3"], { revalidate: 300 });
 
 const TALENT_BOARD_ID = 2110287888;
 
