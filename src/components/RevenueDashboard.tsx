@@ -133,10 +133,10 @@ export default function RevenueDashboard({ summaries, error }: Props) {
           <>
             {/* Stats — update with pod filter */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-7">
+              <StatWidget label="Active Leads" value={String(stats.activeCount)} sub="in pipeline now" accent />
               <StatWidget label="Deals Signed & Underway" value={String(stats.totalDeals)} sub="won + complete" />
               <StatWidget label="Total Revenue" value={fmtNum(stats.totalRevenue)} sub="all time" />
               <StatWidget label="Avg Deal Size" value={fmtNum(stats.avgDealSize)} sub="per deal" />
-              <StatWidget label="Active Leads" value={String(stats.activeCount)} sub="in pipeline now" accent />
             </div>
 
             {filtered.length === 0 ? (

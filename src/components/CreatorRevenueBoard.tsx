@@ -294,16 +294,19 @@ export default function CreatorRevenueBoard({ creator, initialDeals, backUrl }: 
                 ← Analytics
               </Link>
             )}
-            <div className="flex rounded-lg border border-gray-200 overflow-hidden text-[10px] bg-white">
-              {(["lifetime", "year", "quarter", "month", "week"] as Period[]).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPeriod(p)}
-                  className={`px-2.5 py-1.5 transition-colors ${period === p ? "bg-gray-900 text-white" : "text-gray-400 hover:text-gray-600"}`}
-                >
-                  {PERIOD_LABELS[p]}
-                </button>
-              ))}
+            <div className="flex flex-col items-end gap-1">
+              <div className="flex rounded-lg border border-gray-200 overflow-hidden text-[10px] bg-white">
+                {(["lifetime", "year", "quarter", "month", "week"] as Period[]).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setPeriod(p)}
+                    className={`px-2.5 py-1.5 transition-colors ${period === p ? "bg-gray-900 text-white" : "text-gray-400 hover:text-gray-600"}`}
+                  >
+                    {PERIOD_LABELS[p]}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[9px] text-gray-400 italic">Deals judged by the date they were signed off</p>
             </div>
           </div>
         </div>
@@ -316,8 +319,14 @@ export default function CreatorRevenueBoard({ creator, initialDeals, backUrl }: 
 
         {deals && (
           <>
-            {/* 3 summary stat cards */}
-            <div className="grid grid-cols-3 gap-3 mb-6">
+            {/* Stat cards — active pipeline first, then period-filtered deal stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+              <StatCard
+                label="Active Leads"
+                value={String(deals.activeDeals.length)}
+                sub="in pipeline"
+                accent
+              />
               <StatCard
                 label="Deals Signed & Underway"
                 value={String(periodStats.count)}
@@ -422,12 +431,12 @@ export default function CreatorRevenueBoard({ creator, initialDeals, backUrl }: 
   );
 }
 
-function StatCard({ label, value, sub }: { label: string; value: string; sub: string }) {
+function StatCard({ label, value, sub, accent }: { label: string; value: string; sub: string; accent?: boolean }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-5">
-      <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1">{label}</p>
-      <p className="text-2xl font-semibold text-gray-900 tabular-nums">{value}</p>
-      <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>
+    <div className={`rounded-xl border p-5 ${accent ? "bg-emerald-50 border-emerald-100" : "bg-white border-gray-100"}`}>
+      <p className={`text-[10px] font-medium uppercase tracking-wide mb-1 ${accent ? "text-emerald-600" : "text-gray-400"}`}>{label}</p>
+      <p className={`text-2xl font-semibold tabular-nums ${accent ? "text-emerald-700" : "text-gray-900"}`}>{value}</p>
+      <p className={`text-[10px] mt-0.5 ${accent ? "text-emerald-500" : "text-gray-400"}`}>{sub}</p>
     </div>
   );
 }

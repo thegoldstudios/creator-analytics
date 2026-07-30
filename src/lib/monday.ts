@@ -41,7 +41,7 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
     query {
       boards(ids: [${BOARD_ID}]) {
         columns { id title }
-        groups(ids: ["group_mkthf2s3","group_mkvk4h72","topics","closed","group_mktmffqg"]) {
+        groups {
           id title
           items_page(limit: 500) {
             items { ${ITEM_FRAGMENT} }
