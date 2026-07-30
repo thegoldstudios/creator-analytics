@@ -73,7 +73,16 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
   for (const col of boardColumns) {
     colIdByTitle[col.title.toLowerCase()] = col.id;
   }
-  const convertedValueColId = colIdByTitle["converted value £"] ?? colIdByTitle["converted value"] ?? null;
+  // Find the "Converted Value £" column — try exact then progressively looser matches
+  const convertedValueColId =
+    colIdByTitle["converted value £"] ??
+    colIdByTitle["converted value"] ??
+    Object.entries(colIdByTitle).find(([t]) => t.includes("converted") && t.includes("value"))?.[1] ??
+    null;
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[monday] board columns:", boardColumns.map((c) => `${c.id}="${c.title}"`).join(", "));
+    console.log("[monday] convertedValueColId:", convertedValueColId);
+  }
 
   // Flatten items from all groups
   const groups: { items_page: { items: Record<string, unknown>[] } }[] = board?.groups ?? [];
