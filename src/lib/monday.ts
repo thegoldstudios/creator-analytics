@@ -29,10 +29,13 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
   const token = process.env.MONDAY_API_TOKEN;
   if (!token) throw new Error("MONDAY_API_TOKEN not set");
 
+  // Explicitly list column IDs — Monday only computes formula columns
+  // when they are specifically requested, not in bulk column_values fetches
+  const COLS = `["board_relation_mm0zyhyb","deal_stage","numeric_mkxn9km7","formula_mm3ccg5x","formula_mm3j815q","formula_mm3jf9q2","dropdown_mky8d1kf","date_mky8cdtj","color_mkth7qj"]`;
   const ITEM_FRAGMENT = `
     id name
     group { id title }
-    column_values {
+    column_values(ids: ${COLS}) {
       id text value
       ... on BoardRelationValue { linked_items { id name } }
     }
@@ -113,7 +116,7 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
 }
 
 // Cache Monday data for 5 minutes so repeated page loads don't all hit the API
-export const fetchAllDeals = unstable_cache(_fetchAllDeals, ["monday-deals-v3"], { revalidate: 300 });
+export const fetchAllDeals = unstable_cache(_fetchAllDeals, ["monday-deals-v4"], { revalidate: 300 });
 
 const TALENT_BOARD_ID = 2110287888;
 
