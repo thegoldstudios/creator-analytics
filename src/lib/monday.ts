@@ -35,12 +35,12 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
     column_values {
       id text value
       ... on BoardRelationValue { linked_items { id name } }
+      ... on FormulaValue { value }
     }
   `;
   const query = `
     query {
       boards(ids: [${BOARD_ID}]) {
-        columns { id title }
         groups {
           id title
           items_page(limit: 500) {
@@ -65,27 +65,12 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
   const json = await res.json();
   if (json.errors) throw new Error(json.errors[0]?.message ?? "Monday GraphQL error");
 
-  const board = json?.data?.boards?.[0];
-
-  // Build a title→id map from board column definitions
-  const boardColumns: { id: string; title: string }[] = board?.columns ?? [];
-  const colIdByTitle: Record<string, string> = {};
-  for (const col of boardColumns) {
-    colIdByTitle[col.title.toLowerCase()] = col.id;
-  }
-  // Find the "Converted Value £" column — try exact then progressively looser matches
-  const convertedValueColId =
-    colIdByTitle["converted value £"] ??
-    colIdByTitle["converted value"] ??
-    Object.entries(colIdByTitle).find(([t]) => t.includes("converted") && t.includes("value"))?.[1] ??
-    null;
-  if (process.env.NODE_ENV !== "production") {
-    console.log("[monday] board columns:", boardColumns.map((c) => `${c.id}="${c.title}"`).join(", "));
-    console.log("[monday] convertedValueColId:", convertedValueColId);
-  }
+  // Confirmed column ID for "Converted Value £" (formula_mm3ccg5x)
+  const CONVERTED_VALUE_COL = "formula_mm3ccg5x";
 
   // Flatten items from all groups
-  const groups: { items_page: { items: Record<string, unknown>[] } }[] = board?.groups ?? [];
+  const groups: { items_page: { items: Record<string, unknown>[] } }[] =
+    json?.data?.boards?.[0]?.groups ?? [];
   const items: Record<string, unknown>[] = groups.flatMap((g) => g.items_page?.items ?? []);
 
   return items.map((item): MondayDeal => {
@@ -102,8 +87,10 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
       ? cols["dropdown_mky8d1kf"]!.text!.split(",").map((s) => s.trim()).filter(Boolean)
       : [];
 
-    // Prefer "Converted Value £" (GBP-normalised); fall back to raw Deal Value
-    const convertedValue = convertedValueColId ? parseNum(cols[convertedValueColId]?.text) : 0;
+    // Prefer "Converted Value £" formula column; fall back to raw Deal Value
+    // Formula columns expose computed result in `value`, not `text`
+    const convertedRaw = cols[CONVERTED_VALUE_COL];
+    const convertedValue = parseNum(convertedRaw?.value ?? convertedRaw?.text);
     const rawDealValue = parseNum(cols["numeric_mkxn9km7"]?.text);
     const dealValue = convertedValue > 0 ? convertedValue : rawDealValue;
     const tgsCut = parseNum(cols["formula_mm3j815q"]?.text) || Math.round(dealValue * 0.2);
