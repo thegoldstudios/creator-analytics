@@ -161,16 +161,10 @@ export default function RevenueDashboard({ summaries, error }: Props) {
                       {/* Avatar + name */}
                       <div className="flex items-center gap-3 mb-4 pr-6">
                         <div className="relative w-10 h-10 shrink-0">
-                          <CreatorAvatar name={s.talentName} initials={initials} size="sm" />
-                          {s.photoUrl && (
-                            <Image
-                              src={s.photoUrl}
-                              alt={s.talentName}
-                              fill
-                              className="object-cover rounded-full"
-                              unoptimized
-                              onError={(e) => { e.currentTarget.style.display = "none"; }}
-                            />
+                          {s.photoUrl ? (
+                            <Image src={s.photoUrl} alt={s.talentName} fill className="object-cover rounded-full" unoptimized />
+                          ) : (
+                            <CreatorAvatar name={s.talentName} initials={initials} size="sm" />
                           )}
                         </div>
                         <div className="min-w-0">

@@ -73,8 +73,7 @@ export default async function RevenuePage() {
         agent: p.agent as Agent | null,
         talentStatus: p.status,
         creatorId: match?.id ?? null,
-        // Prefer photo from Monday social links; fall back to KV store
-        photoUrl: p.photoUrl ?? match?.photoUrl ?? null,
+        photoUrl: match?.photoUrl ?? null,
         avatar: match?.avatar ?? null,
       };
     })

@@ -218,30 +218,6 @@ const AGENT_MAP: Record<string, string> = {
   "Seth Klein": "Seth",
 };
 
-// Derive a profile photo URL from social media links via unavatar.io
-// Column IDs from Talent Profiles board:
-//   link_mm4fdwcv = YouTube, link_mm4f8gxc = TikTok, link_mm4f7vz4 = Instagram
-//   link_mm4f68ct = X/Twitter, link_mm4fyzmk = Snapchat
-function socialPhotoUrl(cols: Record<string, string | null>): string | null {
-  const platforms: Array<{ colId: string; service: string; pattern: RegExp }> = [
-    { colId: "link_mm4fdwcv", service: "youtube",   pattern: /youtube\.com\/(?:@|channel\/|c\/|user\/)?([^/?&#\s]+)|youtu\.be\/([^/?&#\s]+)/ },
-    { colId: "link_mm4f7vz4", service: "instagram", pattern: /instagram\.com\/([^/?&#\s]+)/ },
-    { colId: "link_mm4f8gxc", service: "tiktok",    pattern: /tiktok\.com\/@?([^/?&#\s]+)/ },
-    { colId: "link_mm4f68ct", service: "twitter",   pattern: /(?:twitter|x)\.com\/([^/?&#\s]+)/ },
-    { colId: "link_mm4fyzmk", service: "snapchat",  pattern: /snapchat\.com\/add\/([^/?&#\s]+)/ },
-  ];
-
-  // Return the first platform that has a parseable URL (YouTube preferred)
-  for (const { colId, service, pattern } of platforms) {
-    const url = cols[colId];
-    if (!url) continue;
-    const m = url.match(pattern);
-    const handle = m?.[1] ?? m?.[2];
-    if (handle) return `https://unavatar.io/${service}/${encodeURIComponent(handle)}`;
-  }
-  return null;
-}
-
 function parseAgent(text: string | null): string | null {
   if (!text) return null;
   for (const [full, short] of Object.entries(AGENT_MAP)) {
@@ -256,7 +232,6 @@ export interface TalentProfile {
   group: string;
   agent: string | null;
   status: string | null;
-  photoUrl: string | null;
 }
 
 export const ALLOWED_TALENT_GROUPS = new Set([
@@ -280,8 +255,8 @@ async function _fetchTalentProfiles(): Promise<TalentProfile[]> {
           items_page(limit: 500) {
             items {
               id name
-              column_values(ids: ["multiple_person_mkv1k4m1", "color_mm4f23s4", "link_mm4fdwcv", "link_mm4f7vz4", "link_mm4f8gxc", "link_mm4f68ct", "link_mm4fyzmk"]) {
-                id text value
+              column_values(ids: ["multiple_person_mkv1k4m1", "color_mm4f23s4"]) {
+                id text
               }
             }
           }
@@ -308,13 +283,8 @@ async function _fetchTalentProfiles(): Promise<TalentProfile[]> {
   for (const group of groups) {
     for (const item of group.items_page?.items ?? []) {
       const cols: Record<string, string | null> = {};
-      for (const cv of item.column_values as { id: string; text: string | null; value: string | null }[]) {
-        // Link columns store the URL in `value` as JSON: {"url":"...","text":"..."}
-        if (cv.value && cv.value.startsWith("{")) {
-          try { cols[cv.id] = JSON.parse(cv.value).url ?? cv.text ?? null; } catch { cols[cv.id] = cv.text ?? null; }
-        } else {
-          cols[cv.id] = cv.text ?? null;
-        }
+      for (const cv of item.column_values as { id: string; text: string | null }[]) {
+        cols[cv.id] = cv.text ?? null;
       }
       const groupLower = group.title.toLowerCase();
       let agent = parseAgent(cols["multiple_person_mkv1k4m1"]);
@@ -326,14 +296,13 @@ async function _fetchTalentProfiles(): Promise<TalentProfile[]> {
         group: group.title,
         agent,
         status: cols["color_mm4f23s4"] ?? null,
-        photoUrl: socialPhotoUrl(cols),
       });
     }
   }
   return profiles;
 }
 
-export const fetchTalentProfiles = unstable_cache(_fetchTalentProfiles, ["monday-talent-profiles-v5"], { revalidate: 300 });
+export const fetchTalentProfiles = unstable_cache(_fetchTalentProfiles, ["monday-talent-profiles-v6"], { revalidate: 300 });
 
 const DONE_GROUPS = new Set(["group_mkthf2s3", "group_mkvk4h72"]);
 
