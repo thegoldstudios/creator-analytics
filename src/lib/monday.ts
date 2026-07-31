@@ -224,32 +224,22 @@ const AGENT_MAP: Record<string, string> = {
 //   link_mm4f68ct = X/Twitter, link_mm4fyzmk = Snapchat
 function socialPhotoUrl(cols: Record<string, string | null>): string | null {
   const platforms: Array<{ colId: string; service: string; pattern: RegExp }> = [
-    { colId: "link_mm4fdwcv", service: "youtube",   pattern: /youtube\.com\/@?([^/?&#\s]+)|youtu\.be\/([^/?&#\s]+)/ },
+    { colId: "link_mm4fdwcv", service: "youtube",   pattern: /youtube\.com\/(?:@|channel\/|c\/|user\/)?([^/?&#\s]+)|youtu\.be\/([^/?&#\s]+)/ },
     { colId: "link_mm4f7vz4", service: "instagram", pattern: /instagram\.com\/([^/?&#\s]+)/ },
     { colId: "link_mm4f8gxc", service: "tiktok",    pattern: /tiktok\.com\/@?([^/?&#\s]+)/ },
     { colId: "link_mm4f68ct", service: "twitter",   pattern: /(?:twitter|x)\.com\/([^/?&#\s]+)/ },
     { colId: "link_mm4fyzmk", service: "snapchat",  pattern: /snapchat\.com\/add\/([^/?&#\s]+)/ },
   ];
 
-  // Collect all available platform URLs
-  const candidates: string[] = [];
+  // Return the first platform that has a parseable URL (YouTube preferred)
   for (const { colId, service, pattern } of platforms) {
     const url = cols[colId];
     if (!url) continue;
     const m = url.match(pattern);
     const handle = m?.[1] ?? m?.[2];
-    if (handle) candidates.push(`https://unavatar.io/${service}/${handle}`);
+    if (handle) return `https://unavatar.io/${service}/${encodeURIComponent(handle)}`;
   }
-
-  if (candidates.length === 0) return null;
-
-  // Build a fallback chain from back to front:
-  // youtube?fallback=instagram  →  instagram?fallback=tiktok  →  tiktok
-  let result = candidates[candidates.length - 1];
-  for (let i = candidates.length - 2; i >= 0; i--) {
-    result = `${candidates[i]}?fallback=${encodeURIComponent(result)}`;
-  }
-  return result;
+  return null;
 }
 
 function parseAgent(text: string | null): string | null {
@@ -343,7 +333,7 @@ async function _fetchTalentProfiles(): Promise<TalentProfile[]> {
   return profiles;
 }
 
-export const fetchTalentProfiles = unstable_cache(_fetchTalentProfiles, ["monday-talent-profiles-v4"], { revalidate: 300 });
+export const fetchTalentProfiles = unstable_cache(_fetchTalentProfiles, ["monday-talent-profiles-v5"], { revalidate: 300 });
 
 const DONE_GROUPS = new Set(["group_mkthf2s3", "group_mkvk4h72"]);
 
