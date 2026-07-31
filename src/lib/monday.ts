@@ -86,22 +86,6 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
     }
   `;
 
-  type RawItem = Record<string, unknown>;
-  type RawGroup = { id: string; title: string; items_page: { cursor: string | null; items: RawItem[] } };
-
-  async function fetchPage(query: string): Promise<{ groups: RawGroup[] }> {
-    const res = await fetch(MONDAY_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: token! },
-      body: JSON.stringify({ query }),
-      cache: "no-store",
-    });
-    if (!res.ok) throw new Error(`Monday API ${res.status}`);
-    const json = await res.json();
-    if (json.errors) throw new Error(json.errors[0]?.message ?? "Monday GraphQL error");
-    return { groups: json?.data?.boards?.[0]?.groups ?? [] };
-  }
-
   // Initial fetch: Won, Campaign Complete, and Active Leads groups
   const initialQuery = `
     query {
@@ -117,60 +101,66 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
     }
   `;
 
-  const [{ groups: initialGroups }, rates] = await Promise.all([
-    fetchPage(initialQuery),
+  const [initialRes, rates] = await Promise.all([
+    fetch(MONDAY_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: token },
+      body: JSON.stringify({ query: initialQuery }),
+      cache: "no-store",
+    }),
     ratesPromise,
   ]);
 
-  console.log("[monday] groups fetched:", initialGroups.map((g) => `${g.title}(${g.id}): ${g.items_page.items.length} items, cursor=${!!g.items_page.cursor}`));
+  if (!initialRes.ok) throw new Error(`Monday API ${initialRes.status}`);
+  const initialJson = await initialRes.json();
+  if (initialJson.errors) throw new Error(initialJson.errors[0]?.message ?? "Monday GraphQL error");
 
-  // Follow pagination cursors for any group that has more than 500 items
-  const allGroupItems: { group: { id: string; title: string }; items: RawItem[] }[] = [];
-  const cursorFollows: Promise<void>[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const initialGroups: any[] = initialJson?.data?.boards?.[0]?.groups ?? [];
+  console.log("[monday] groups fetched:", initialGroups.map((g: any) => `${g.title}(${g.id}): ${g.items_page.items.length} items, cursor=${!!g.items_page.cursor}`));
 
-  for (const group of initialGroups) {
-    const groupMeta = { id: group.id, title: group.title };
-    const pageItems = group.items_page.items.map((item) => ({ ...item, group: groupMeta }));
-    const entry = { group: groupMeta, items: pageItems };
-    allGroupItems.push(entry);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allItems: any[] = initialGroups.flatMap((g: any) => g.items_page.items);
 
-    if (group.items_page.cursor) {
-      cursorFollows.push(
-        (async () => {
-          let cursor: string | null = group.items_page.cursor;
-          while (cursor) {
-            const nextQuery = `
-              query {
-                next_items_page(limit: 500, cursor: "${cursor}") {
-                  cursor
-                  items { ${ITEM_FRAGMENT} }
-                }
+  // Follow pagination cursors for groups with >500 items
+  const cursorFollows = initialGroups
+    .filter((g: any) => g.items_page.cursor)
+    .map((g: any) =>
+      (async () => {
+        let cursor: string | null = g.items_page.cursor;
+        let count = g.items_page.items.length;
+        while (cursor) {
+          const nextQuery = `
+            query {
+              next_items_page(limit: 500, cursor: "${cursor}") {
+                cursor
+                items { ${ITEM_FRAGMENT} }
               }
-            `;
-            const nextRes = await fetch(MONDAY_API, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: token! },
-              body: JSON.stringify({ query: nextQuery }),
-              cache: "no-store",
-            });
-            if (!nextRes.ok) break;
-            const nextJson = await nextRes.json();
-            if (nextJson.errors) break;
-            const page = nextJson?.data?.next_items_page;
-            const nextItems: RawItem[] = (page?.items ?? []).map((item: RawItem) => ({ ...item, group: groupMeta }));
-            entry.items.push(...nextItems);
-            cursor = page?.cursor ?? null;
-          }
-          console.log(`[monday] pagination done for ${groupMeta.title}: ${entry.items.length} total items`);
-        })()
-      );
-    }
-  }
+            }
+          `;
+          const nextRes = await fetch(MONDAY_API, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: token },
+            body: JSON.stringify({ query: nextQuery }),
+            cache: "no-store",
+          });
+          if (!nextRes.ok) break;
+          const nextJson = await nextRes.json();
+          if (nextJson.errors) break;
+          const page = nextJson?.data?.next_items_page;
+          const pageItems = page?.items ?? [];
+          allItems.push(...pageItems);
+          count += pageItems.length;
+          cursor = page?.cursor ?? null;
+        }
+        console.log(`[monday] pagination done for ${g.title}: ${count} total items`);
+      })()
+    );
 
   await Promise.all(cursorFollows);
+  console.log("[monday] total items after pagination:", allItems.length);
 
-  const items: RawItem[] = allGroupItems.flatMap((g) => g.items);
-  console.log("[monday] total items after pagination:", items.length);
+  const items = allItems;
 
   return items.map((item): MondayDeal => {
     const cols: Record<string, { text: string | null; value: string | null; linked_items?: { id: string; name: string }[] }> = {};
@@ -217,7 +207,7 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
 }
 
 // Cache Monday data for 5 minutes
-export const fetchAllDeals = unstable_cache(_fetchAllDeals, ["monday-deals-v10"], { revalidate: 300 });
+export const fetchAllDeals = unstable_cache(_fetchAllDeals, ["monday-deals-v11"], { revalidate: 300 });
 
 const TALENT_BOARD_ID = 2110287888;
 
