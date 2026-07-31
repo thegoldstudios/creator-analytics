@@ -110,12 +110,13 @@ function _aggregate(deals: MondayDeal[]): CreatorDeals {
 
 export async function getCreatorDealsByProfileId(talentProfileId: string): Promise<CreatorDeals> {
   const all = await fetchAllDeals();
-  return _aggregate(all.filter((d) => d.talentProfileId === talentProfileId));
+  return _aggregate(all.filter((d) => d.allTalentProfileIds.includes(talentProfileId)));
 }
 
 export async function getCreatorDeals(talentName: string): Promise<CreatorDeals> {
   const all = await fetchAllDeals();
   const normTarget = norm(talentName);
+  // Match against ALL linked talent names (some deals link multiple creators)
   const deals = all.filter((d) => {
     if (!d.talentName) return false;
     const n = norm(d.talentName);

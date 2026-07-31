@@ -39,19 +39,20 @@ export default async function RevenuePage() {
     return null;
   }
 
-  // Aggregate deals by talent profile ID
+  // Aggregate deals by talent profile ID (credit ALL linked talents on multi-talent deals)
   const dealsByProfile: Record<string, { totalDeals: number; totalRevenue: number; tgsRevenue: number; activeDeals: number }> = {};
   for (const deal of deals) {
-    const key = deal.talentProfileId ?? "";
-    if (!key) continue;
-    if (!dealsByProfile[key]) dealsByProfile[key] = { totalDeals: 0, totalRevenue: 0, tgsRevenue: 0, activeDeals: 0 };
-    if (isWon(deal)) {
-      dealsByProfile[key].totalDeals++;
-      dealsByProfile[key].totalRevenue += deal.dealValue;
-      dealsByProfile[key].tgsRevenue += deal.tgsCut;
-    }
-    if (isActive(deal)) {
-      dealsByProfile[key].activeDeals++;
+    const keys = deal.allTalentProfileIds.length > 0 ? deal.allTalentProfileIds : (deal.talentProfileId ? [deal.talentProfileId] : []);
+    for (const key of keys) {
+      if (!dealsByProfile[key]) dealsByProfile[key] = { totalDeals: 0, totalRevenue: 0, tgsRevenue: 0, activeDeals: 0 };
+      if (isWon(deal)) {
+        dealsByProfile[key].totalDeals++;
+        dealsByProfile[key].totalRevenue += deal.dealValue;
+        dealsByProfile[key].tgsRevenue += deal.tgsCut;
+      }
+      if (isActive(deal)) {
+        dealsByProfile[key].activeDeals++;
+      }
     }
   }
 

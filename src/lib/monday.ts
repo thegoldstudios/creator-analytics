@@ -10,6 +10,8 @@ export interface MondayDeal {
   group: { id: string; title: string };
   talentName: string | null;
   talentProfileId: string | null;
+  // All talent profiles linked to this deal (some deals link multiple creators)
+  allTalentProfileIds: string[];
   stage: string;
   dealValue: number; // always GBP
   currency: string;  // original currency from Monday
@@ -20,6 +22,14 @@ export interface MondayDeal {
   talentCut: number;
   tgsCut: number;
 }
+
+// Stages that represent a genuine active pipeline (not mass outreach or dead)
+export const ACTIVE_STAGES = new Set([
+  "negotiation",
+  "contracts and agreements",
+  "proposal sent",
+  "gifted",
+]);
 
 function parseNum(text: string | null | undefined): number {
   if (!text) return 0;
@@ -75,14 +85,31 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
       ... on BoardRelationValue { linked_items { id name } }
     }
   `;
-  // Fetch Won, Campaign Complete, and Active Leads groups only
-  // "topics" = Active Leads, group_mkthf2s3 = Won, group_mkvk4h72 = Campaign Complete
-  const query = `
+
+  type RawItem = Record<string, unknown>;
+  type RawGroup = { id: string; title: string; items_page: { cursor: string | null; items: RawItem[] } };
+
+  async function fetchPage(query: string): Promise<{ groups: RawGroup[] }> {
+    const res = await fetch(MONDAY_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: token! },
+      body: JSON.stringify({ query }),
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`Monday API ${res.status}`);
+    const json = await res.json();
+    if (json.errors) throw new Error(json.errors[0]?.message ?? "Monday GraphQL error");
+    return { groups: json?.data?.boards?.[0]?.groups ?? [] };
+  }
+
+  // Initial fetch: Won, Campaign Complete, and Active Leads groups
+  const initialQuery = `
     query {
       boards(ids: [${BOARD_ID}]) {
         groups(ids: ["group_mkthf2s3","group_mkvk4h72","topics"]) {
           id title
           items_page(limit: 500) {
+            cursor
             items { ${ITEM_FRAGMENT} }
           }
         }
@@ -90,23 +117,60 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
     }
   `;
 
-  const [res, rates] = await Promise.all([
-    fetch(MONDAY_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: token },
-      body: JSON.stringify({ query }),
-      cache: "no-store",
-    }),
+  const [{ groups: initialGroups }, rates] = await Promise.all([
+    fetchPage(initialQuery),
     ratesPromise,
   ]);
 
-  if (!res.ok) throw new Error(`Monday API ${res.status}`);
-  const json = await res.json();
-  if (json.errors) throw new Error(json.errors[0]?.message ?? "Monday GraphQL error");
+  console.log("[monday] groups fetched:", initialGroups.map((g) => `${g.title}(${g.id}): ${g.items_page.items.length} items, cursor=${!!g.items_page.cursor}`));
 
-  const groups: { items_page: { items: Record<string, unknown>[] } }[] =
-    json?.data?.boards?.[0]?.groups ?? [];
-  const items: Record<string, unknown>[] = groups.flatMap((g) => g.items_page?.items ?? []);
+  // Follow pagination cursors for any group that has more than 500 items
+  const allGroupItems: { group: { id: string; title: string }; items: RawItem[] }[] = [];
+  const cursorFollows: Promise<void>[] = [];
+
+  for (const group of initialGroups) {
+    const groupMeta = { id: group.id, title: group.title };
+    const pageItems = group.items_page.items.map((item) => ({ ...item, group: groupMeta }));
+    const entry = { group: groupMeta, items: pageItems };
+    allGroupItems.push(entry);
+
+    if (group.items_page.cursor) {
+      cursorFollows.push(
+        (async () => {
+          let cursor: string | null = group.items_page.cursor;
+          while (cursor) {
+            const nextQuery = `
+              query {
+                next_items_page(limit: 500, cursor: "${cursor}") {
+                  cursor
+                  items { ${ITEM_FRAGMENT} }
+                }
+              }
+            `;
+            const nextRes = await fetch(MONDAY_API, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: token! },
+              body: JSON.stringify({ query: nextQuery }),
+              cache: "no-store",
+            });
+            if (!nextRes.ok) break;
+            const nextJson = await nextRes.json();
+            if (nextJson.errors) break;
+            const page = nextJson?.data?.next_items_page;
+            const nextItems: RawItem[] = (page?.items ?? []).map((item: RawItem) => ({ ...item, group: groupMeta }));
+            entry.items.push(...nextItems);
+            cursor = page?.cursor ?? null;
+          }
+          console.log(`[monday] pagination done for ${groupMeta.title}: ${entry.items.length} total items`);
+        })()
+      );
+    }
+  }
+
+  await Promise.all(cursorFollows);
+
+  const items: RawItem[] = allGroupItems.flatMap((g) => g.items);
+  console.log("[monday] total items after pagination:", items.length);
 
   return items.map((item): MondayDeal => {
     const cols: Record<string, { text: string | null; value: string | null; linked_items?: { id: string; name: string }[] }> = {};
@@ -114,9 +178,11 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
       cols[cv.id] = cv;
     }
 
-    const talentLinked = cols["board_relation_mm0zyhyb"]?.linked_items?.[0] ?? null;
+    const linkedItems = cols["board_relation_mm0zyhyb"]?.linked_items ?? [];
+    const talentLinked = linkedItems[0] ?? null;
     const talentName = talentLinked?.name ?? null;
     const talentProfileId = talentLinked?.id ?? null;
+    const allTalentProfileIds = linkedItems.map((li) => li.id);
 
     const platforms = cols["dropdown_mky8d1kf"]?.text
       ? cols["dropdown_mky8d1kf"]!.text!.split(",").map((s) => s.trim()).filter(Boolean)
@@ -136,6 +202,7 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
       group: item.group as { id: string; title: string },
       talentName,
       talentProfileId,
+      allTalentProfileIds,
       stage: cols["deal_stage"]?.text ?? "Unknown",
       dealValue,
       currency,
@@ -150,7 +217,7 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
 }
 
 // Cache Monday data for 5 minutes
-export const fetchAllDeals = unstable_cache(_fetchAllDeals, ["monday-deals-v6"], { revalidate: 300 });
+export const fetchAllDeals = unstable_cache(_fetchAllDeals, ["monday-deals-v10"], { revalidate: 300 });
 
 const TALENT_BOARD_ID = 2110287888;
 
@@ -254,7 +321,8 @@ export function isWon(deal: MondayDeal) {
 }
 
 export function isActive(deal: MondayDeal) {
-  return deal.group.id === "topics";
+  // "topics" = Active Leads group; filter by meaningful stages only (not mass outreach "New Lead")
+  return deal.group.id === "topics" && ACTIVE_STAGES.has(deal.stage.toLowerCase());
 }
 
 export function fmt(n: number) {
