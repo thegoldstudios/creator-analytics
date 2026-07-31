@@ -230,14 +230,26 @@ function socialPhotoUrl(cols: Record<string, string | null>): string | null {
     { colId: "link_mm4f68ct", service: "twitter",   pattern: /(?:twitter|x)\.com\/([^/?&#\s]+)/ },
     { colId: "link_mm4fyzmk", service: "snapchat",  pattern: /snapchat\.com\/add\/([^/?&#\s]+)/ },
   ];
+
+  // Collect all available platform URLs
+  const candidates: string[] = [];
   for (const { colId, service, pattern } of platforms) {
     const url = cols[colId];
     if (!url) continue;
     const m = url.match(pattern);
     const handle = m?.[1] ?? m?.[2];
-    if (handle) return `https://unavatar.io/${service}/${handle}`;
+    if (handle) candidates.push(`https://unavatar.io/${service}/${handle}`);
   }
-  return null;
+
+  if (candidates.length === 0) return null;
+
+  // Build a fallback chain from back to front:
+  // youtube?fallback=instagram  →  instagram?fallback=tiktok  →  tiktok
+  let result = candidates[candidates.length - 1];
+  for (let i = candidates.length - 2; i >= 0; i--) {
+    result = `${candidates[i]}?fallback=${encodeURIComponent(result)}`;
+  }
+  return result;
 }
 
 function parseAgent(text: string | null): string | null {
@@ -331,7 +343,7 @@ async function _fetchTalentProfiles(): Promise<TalentProfile[]> {
   return profiles;
 }
 
-export const fetchTalentProfiles = unstable_cache(_fetchTalentProfiles, ["monday-talent-profiles-v3"], { revalidate: 300 });
+export const fetchTalentProfiles = unstable_cache(_fetchTalentProfiles, ["monday-talent-profiles-v4"], { revalidate: 300 });
 
 const DONE_GROUPS = new Set(["group_mkthf2s3", "group_mkvk4h72"]);
 
