@@ -15,6 +15,7 @@ export interface CreatorRevSummary {
   avgDealSize: number;
   tgsRevenue: number;
   activeDeals: number;
+  ongoingDeals: number;
   creatorId: string | null;
   agent: Agent | null;
   photoUrl: string | null;
@@ -47,12 +48,9 @@ export default function RevenueDashboard({ summaries, error }: Props) {
 
   // Stats computed from the filtered set so they update with pod toggle
   const stats = useMemo(() => {
-    const totalDeals = filtered.reduce((s, c) => s + c.totalDeals, 0);
-    const totalRevenue = filtered.reduce((s, c) => s + c.totalRevenue, 0);
-    const avgDealSize = totalDeals > 0 ? Math.round(totalRevenue / totalDeals) : 0;
-    const tgsRevenue = filtered.reduce((s, c) => s + c.tgsRevenue, 0);
     const activeCount = filtered.reduce((s, c) => s + c.activeDeals, 0);
-    return { totalDeals, totalRevenue, avgDealSize, tgsRevenue, activeCount };
+    const ongoingCount = filtered.reduce((s, c) => s + c.ongoingDeals, 0);
+    return { activeCount, ongoingCount };
   }, [filtered]);
 
   const agentCount = (agent: Agent | "All") =>
@@ -132,11 +130,9 @@ export default function RevenueDashboard({ summaries, error }: Props) {
         ) : (
           <>
             {/* Stats — update with pod filter */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-7">
-              <StatWidget label="Active Leads" value={String(stats.activeCount)} sub="in pipeline now" accent />
-              <StatWidget label="Deals Signed & Underway" value={String(stats.totalDeals)} sub="won + complete" />
-              <StatWidget label="Total Revenue" value={fmtNum(stats.totalRevenue)} sub="all time" />
-              <StatWidget label="Avg Deal Size" value={fmtNum(stats.avgDealSize)} sub="per deal" />
+            <div className="grid grid-cols-2 gap-3 mb-7">
+              <StatWidget label="Active Leads" value={String(stats.activeCount)} sub="negotiation + contracts" accent />
+              <StatWidget label="Ongoing Campaigns in Progress" value={String(stats.ongoingCount)} sub="signed, not yet posted" />
             </div>
 
             {filtered.length === 0 ? (
@@ -190,15 +186,19 @@ export default function RevenueDashboard({ summaries, error }: Props) {
                         </div>
                       </div>
 
-                      {s.activeDeals > 0 && (
-                        <div className="mt-3 pt-3 border-t border-gray-50 flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                          <span className="text-[11px] font-semibold text-emerald-700">
-                            {s.activeDeals} active lead{s.activeDeals !== 1 ? "s" : ""}
-                          </span>
-                          <span className="text-[10px] text-gray-400">in pipeline</span>
-                        </div>
-                      )}
+                      <div className="mt-3 pt-3 border-t border-gray-50 flex items-center gap-2">
+                        {s.activeDeals > 0 ? (
+                          <>
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                            <span className="text-[11px] font-semibold text-emerald-700">
+                              {s.activeDeals} active lead{s.activeDeals !== 1 ? "s" : ""}
+                            </span>
+                            <span className="text-[10px] text-gray-400">in pipeline</span>
+                          </>
+                        ) : (
+                          <span className="text-[11px] font-medium text-red-400">No active leads in pipeline</span>
+                        )}
+                      </div>
                     </div>
                   );
 

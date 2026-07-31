@@ -310,6 +310,11 @@ export function isWon(deal: MondayDeal) {
   return DONE_GROUPS.has(deal.group.id);
 }
 
+// Signed off but not yet posted — Won group only, excludes Campaign Complete
+export function isOngoing(deal: MondayDeal) {
+  return deal.group.id === "group_mkthf2s3";
+}
+
 export function isActive(deal: MondayDeal) {
   // "topics" = Active Leads group; filter by meaningful stages only (not mass outreach "New Lead")
   return deal.group.id === "topics" && ACTIVE_STAGES.has(deal.stage.toLowerCase());

@@ -1,6 +1,6 @@
 export const revalidate = 300; // ISR: cache full page at edge for 5 minutes
 
-import { fetchAllDeals, fetchTalentProfiles, isWon, isActive, MondayDeal, ALLOWED_TALENT_GROUPS } from "@/lib/monday";
+import { fetchAllDeals, fetchTalentProfiles, isWon, isOngoing, isActive, MondayDeal, ALLOWED_TALENT_GROUPS } from "@/lib/monday";
 import { getAllCreators } from "@/lib/creators-store";
 import { Agent } from "@/lib/types";
 import RevenueDashboard, { CreatorRevSummary } from "@/components/RevenueDashboard";
@@ -40,15 +40,18 @@ export default async function RevenuePage() {
   }
 
   // Aggregate deals by talent profile ID (credit ALL linked talents on multi-talent deals)
-  const dealsByProfile: Record<string, { totalDeals: number; totalRevenue: number; tgsRevenue: number; activeDeals: number }> = {};
+  const dealsByProfile: Record<string, { totalDeals: number; totalRevenue: number; tgsRevenue: number; activeDeals: number; ongoingDeals: number }> = {};
   for (const deal of deals) {
     const keys = deal.allTalentProfileIds.length > 0 ? deal.allTalentProfileIds : (deal.talentProfileId ? [deal.talentProfileId] : []);
     for (const key of keys) {
-      if (!dealsByProfile[key]) dealsByProfile[key] = { totalDeals: 0, totalRevenue: 0, tgsRevenue: 0, activeDeals: 0 };
+      if (!dealsByProfile[key]) dealsByProfile[key] = { totalDeals: 0, totalRevenue: 0, tgsRevenue: 0, activeDeals: 0, ongoingDeals: 0 };
       if (isWon(deal)) {
         dealsByProfile[key].totalDeals++;
         dealsByProfile[key].totalRevenue += deal.dealValue;
         dealsByProfile[key].tgsRevenue += deal.tgsCut;
+      }
+      if (isOngoing(deal)) {
+        dealsByProfile[key].ongoingDeals++;
       }
       if (isActive(deal)) {
         dealsByProfile[key].activeDeals++;
@@ -60,7 +63,7 @@ export default async function RevenuePage() {
   const summaries: CreatorRevSummary[] = profiles
     .filter((p) => ALLOWED_TALENT_GROUPS.has(p.group.toLowerCase()))
     .map((p): CreatorRevSummary => {
-      const d = dealsByProfile[p.id] ?? { totalDeals: 0, totalRevenue: 0, tgsRevenue: 0, activeDeals: 0 };
+      const d = dealsByProfile[p.id] ?? { totalDeals: 0, totalRevenue: 0, tgsRevenue: 0, activeDeals: 0, ongoingDeals: 0 };
       const match = matchCreator(p.name);
       return {
         talentProfileId: p.id,
@@ -70,6 +73,7 @@ export default async function RevenuePage() {
         avgDealSize: d.totalDeals > 0 ? Math.round(d.totalRevenue / d.totalDeals) : 0,
         tgsRevenue: d.tgsRevenue,
         activeDeals: d.activeDeals,
+        ongoingDeals: d.ongoingDeals,
         agent: p.agent as Agent | null,
         talentStatus: p.status,
         creatorId: match?.id ?? null,
