@@ -219,13 +219,16 @@ const AGENT_MAP: Record<string, string> = {
 };
 
 // Derive a profile photo URL from social media links via unavatar.io
+// Column IDs from Talent Profiles board:
+//   link_mm4fdwcv = YouTube, link_mm4f8gxc = TikTok, link_mm4f7vz4 = Instagram
+//   link_mm4f68ct = X/Twitter, link_mm4fyzmk = Snapchat
 function socialPhotoUrl(cols: Record<string, string | null>): string | null {
   const platforms: Array<{ colId: string; service: string; pattern: RegExp }> = [
-    { colId: "link_mm4fdwcv", service: "youtube",   pattern: /youtube\.com\/@?([^/?&#]+)|youtu\.be\/([^/?&#]+)/ },
-    { colId: "link_mm4f8gxc", service: "instagram", pattern: /instagram\.com\/([^/?&#]+)/ },
-    { colId: "link_mm4f68ct", service: "twitter",   pattern: /(?:twitter|x)\.com\/([^/?&#]+)/ },
-    { colId: "link_mm4fyzmk", service: "snapchat",  pattern: /snapchat\.com\/add\/([^/?&#]+)/ },
-    { colId: "link_mm4f8gxc", service: "tiktok",    pattern: /tiktok\.com\/@?([^/?&#]+)/ },
+    { colId: "link_mm4fdwcv", service: "youtube",   pattern: /youtube\.com\/@?([^/?&#\s]+)|youtu\.be\/([^/?&#\s]+)/ },
+    { colId: "link_mm4f7vz4", service: "instagram", pattern: /instagram\.com\/([^/?&#\s]+)/ },
+    { colId: "link_mm4f8gxc", service: "tiktok",    pattern: /tiktok\.com\/@?([^/?&#\s]+)/ },
+    { colId: "link_mm4f68ct", service: "twitter",   pattern: /(?:twitter|x)\.com\/([^/?&#\s]+)/ },
+    { colId: "link_mm4fyzmk", service: "snapchat",  pattern: /snapchat\.com\/add\/([^/?&#\s]+)/ },
   ];
   for (const { colId, service, pattern } of platforms) {
     const url = cols[colId];
@@ -275,7 +278,7 @@ async function _fetchTalentProfiles(): Promise<TalentProfile[]> {
           items_page(limit: 500) {
             items {
               id name
-              column_values(ids: ["multiple_person_mkv1k4m1", "color_mm4f23s4", "link_mm4fdwcv", "link_mm4f8gxc", "link_mm4f7vz4", "link_mm4f68ct", "link_mm4fyzmk"]) {
+              column_values(ids: ["multiple_person_mkv1k4m1", "color_mm4f23s4", "link_mm4fdwcv", "link_mm4f7vz4", "link_mm4f8gxc", "link_mm4f68ct", "link_mm4fyzmk"]) {
                 id text value
               }
             }
@@ -328,7 +331,7 @@ async function _fetchTalentProfiles(): Promise<TalentProfile[]> {
   return profiles;
 }
 
-export const fetchTalentProfiles = unstable_cache(_fetchTalentProfiles, ["monday-talent-profiles-v2"], { revalidate: 300 });
+export const fetchTalentProfiles = unstable_cache(_fetchTalentProfiles, ["monday-talent-profiles-v3"], { revalidate: 300 });
 
 const DONE_GROUPS = new Set(["group_mkthf2s3", "group_mkvk4h72"]);
 
