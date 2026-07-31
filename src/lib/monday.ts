@@ -11,7 +11,9 @@ export interface MondayDeal {
   talentName: string | null;
   talentProfileId: string | null;
   stage: string;
-  dealValue: number;
+  dealValue: number; // always GBP
+  currency: string;  // original currency from Monday
+  dealValueRaw: number; // original amount before conversion
   platforms: string[];
   wonDate: string | null;
   dealType: string;
@@ -25,13 +27,46 @@ function parseNum(text: string | null | undefined): number {
   return isNaN(n) ? 0 : n;
 }
 
+// Fetch live GBP exchange rates from open.er-api.com (free, no key needed)
+// Returns rates relative to GBP: rates["USD"] = 1.27 means £1 = $1.27
+async function _fetchExchangeRates(): Promise<Record<string, number>> {
+  try {
+    const res = await fetch("https://open.er-api.com/v6/latest/GBP", {
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`Exchange rate API ${res.status}`);
+    const json = await res.json();
+    return (json.rates as Record<string, number>) ?? {};
+  } catch {
+    // Fallback rates if API is unavailable
+    return { GBP: 1, USD: 1.27, EUR: 1.17, CAD: 1.72, AUD: 1.96 };
+  }
+}
+
+// Cache exchange rates for 1 hour
+export const fetchExchangeRates = unstable_cache(
+  _fetchExchangeRates,
+  ["exchange-rates-gbp"],
+  { revalidate: 3600 }
+);
+
+function toGBP(amount: number, currency: string, rates: Record<string, number>): number {
+  if (!amount) return 0;
+  const cur = currency.trim().toUpperCase();
+  if (!cur || cur === "GBP" || cur === "PICK CURRENCY") return amount;
+  const rate = rates[cur];
+  if (!rate) return amount; // unknown currency — return as-is
+  return Math.round((amount / rate) * 100) / 100;
+}
+
 async function _fetchAllDeals(): Promise<MondayDeal[]> {
   const token = process.env.MONDAY_API_TOKEN;
   if (!token) throw new Error("MONDAY_API_TOKEN not set");
 
-  // Explicitly list column IDs — Monday only computes formula columns
-  // when they are specifically requested, not in bulk column_values fetches
-  const COLS = `["board_relation_mm0zyhyb","deal_stage","numeric_mkxn9km7","formula_mm3ccg5x","formula_mm3j815q","formula_mm3jf9q2","dropdown_mky8d1kf","date_mky8cdtj","color_mkth7qj"]`;
+  // Fetch exchange rates in parallel with Monday data
+  const ratesPromise = fetchExchangeRates();
+
+  const COLS = `["board_relation_mm0zyhyb","deal_stage","numeric_mkxn9km7","color_mm2f2s8s","formula_mm3j815q","formula_mm3jf9q2","dropdown_mky8d1kf","date_mky8cdtj","color_mkth7qj"]`;
   const ITEM_FRAGMENT = `
     id name
     group { id title }
@@ -53,24 +88,20 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
     }
   `;
 
-  const res = await fetch(MONDAY_API, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: token,
-    },
-    body: JSON.stringify({ query }),
-    cache: "no-store",
-  });
+  const [res, rates] = await Promise.all([
+    fetch(MONDAY_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: token },
+      body: JSON.stringify({ query }),
+      cache: "no-store",
+    }),
+    ratesPromise,
+  ]);
 
   if (!res.ok) throw new Error(`Monday API ${res.status}`);
   const json = await res.json();
   if (json.errors) throw new Error(json.errors[0]?.message ?? "Monday GraphQL error");
 
-  // Confirmed column ID for "Converted Value £" (formula_mm3ccg5x)
-  const CONVERTED_VALUE_COL = "formula_mm3ccg5x";
-
-  // Flatten items from all groups
   const groups: { items_page: { items: Record<string, unknown>[] } }[] =
     json?.data?.boards?.[0]?.groups ?? [];
   const items: Record<string, unknown>[] = groups.flatMap((g) => g.items_page?.items ?? []);
@@ -89,11 +120,10 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
       ? cols["dropdown_mky8d1kf"]!.text!.split(",").map((s) => s.trim()).filter(Boolean)
       : [];
 
-    // "Converted Value £" is a formula column — computed result is in `text`, not `value`
-    // (`value` stores the raw cell state as "0"; using it causes wrong fallback)
-    const convertedValue = parseNum(cols[CONVERTED_VALUE_COL]?.text);
-    const rawDealValue = parseNum(cols["numeric_mkxn9km7"]?.text);
-    const dealValue = convertedValue > 0 ? convertedValue : rawDealValue;
+    const currency = cols["color_mm2f2s8s"]?.text ?? "GBP";
+    const dealValueRaw = parseNum(cols["numeric_mkxn9km7"]?.text);
+    const dealValue = toGBP(dealValueRaw, currency, rates);
+
     const tgsCut = parseNum(cols["formula_mm3j815q"]?.text) || Math.round(dealValue * 0.2);
     const talentCut = parseNum(cols["formula_mm3jf9q2"]?.text) || Math.round(dealValue * 0.8);
 
@@ -106,6 +136,8 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
       talentProfileId,
       stage: cols["deal_stage"]?.text ?? "Unknown",
       dealValue,
+      currency,
+      dealValueRaw,
       platforms,
       wonDate: cols["date_mky8cdtj"]?.text ?? null,
       dealType: cols["color_mkth7qj"]?.text ?? "",
@@ -115,12 +147,11 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
   });
 }
 
-// Cache Monday data for 5 minutes so repeated page loads don't all hit the API
-export const fetchAllDeals = unstable_cache(_fetchAllDeals, ["monday-deals-v4"], { revalidate: 300 });
+// Cache Monday data for 5 minutes
+export const fetchAllDeals = unstable_cache(_fetchAllDeals, ["monday-deals-v5"], { revalidate: 300 });
 
 const TALENT_BOARD_ID = 2110287888;
 
-// Map agent full name → our Agent type
 const AGENT_MAP: Record<string, string> = {
   "Maddie Warn": "Maddie",
   "Elicia Jones": "Elicia",
@@ -139,12 +170,11 @@ function parseAgent(text: string | null): string | null {
 export interface TalentProfile {
   id: string;
   name: string;
-  group: string; // group title from Monday
+  group: string;
   agent: string | null;
-  status: string | null; // Happy, Urgent, Push, Leaving, etc.
+  status: string | null;
 }
 
-// Only these groups from the Talent Profiles board appear on the Revenue page
 export const ALLOWED_TALENT_GROUPS = new Set([
   "gold talent uk - pod a",
   "gold talent uk - pod b",
@@ -199,7 +229,6 @@ async function _fetchTalentProfiles(): Promise<TalentProfile[]> {
       }
       const groupLower = group.title.toLowerCase();
       let agent = parseAgent(cols["multiple_person_mkv1k4m1"]);
-      // Gold Arena managers aren't in the person column — derive from group
       if (!agent && groupLower.includes("gold arena uk")) agent = "Kelvin";
       if (!agent && groupLower.includes("gold arena us")) agent = "Emerson";
       profiles.push({
@@ -216,15 +245,14 @@ async function _fetchTalentProfiles(): Promise<TalentProfile[]> {
 
 export const fetchTalentProfiles = unstable_cache(_fetchTalentProfiles, ["monday-talent-profiles"], { revalidate: 300 });
 
-// Groups that count as completed/won deals
-const DONE_GROUPS = new Set(["group_mkthf2s3", "group_mkvk4h72"]); // Won + Campaign Complete
+const DONE_GROUPS = new Set(["group_mkthf2s3", "group_mkvk4h72"]);
 
 export function isWon(deal: MondayDeal) {
   return DONE_GROUPS.has(deal.group.id);
 }
 
 export function isActive(deal: MondayDeal) {
-  return deal.group.id === "topics"; // Active Leads
+  return deal.group.id === "topics";
 }
 
 export function fmt(n: number) {

@@ -11,7 +11,9 @@ export interface DealItem {
   name: string;
   url: string;
   stage: string;
-  dealValue: number;
+  dealValue: number;   // GBP converted
+  currency: string;   // original currency
+  dealValueRaw: number; // original amount
   platforms: string[];
   dealType: string;
   wonDate?: string;
@@ -94,12 +96,13 @@ function _aggregate(deals: MondayDeal[]): CreatorDeals {
     revenueByWeek,
     activeDeals: activeDeals.map((d) => ({
       id: d.id, name: d.name, url: d.url, stage: d.stage,
-      dealValue: d.dealValue, platforms: d.platforms, dealType: d.dealType,
-      group: d.group.title,
+      dealValue: d.dealValue, currency: d.currency, dealValueRaw: d.dealValueRaw,
+      platforms: d.platforms, dealType: d.dealType, group: d.group.title,
     })),
     wonDeals: wonDeals.map((d) => ({
       id: d.id, name: d.name, url: d.url, stage: d.stage,
-      dealValue: d.dealValue, platforms: d.platforms, dealType: d.dealType,
+      dealValue: d.dealValue, currency: d.currency, dealValueRaw: d.dealValueRaw,
+      platforms: d.platforms, dealType: d.dealType,
       wonDate: d.wonDate ?? undefined, group: d.group.title,
     })),
   };

@@ -413,8 +413,15 @@ export default function CreatorRevenueBoard({ creator, initialDeals, backUrl }: 
                           {d.platforms.length > 0 ? d.platforms.join(", ") : "—"}
                         </td>
                         <td className="px-3 py-3 text-gray-400">{d.dealType || "—"}</td>
-                        <td className="px-5 py-3 text-right font-medium text-gray-800 tabular-nums">
-                          {d.dealValue > 0 ? fmt(d.dealValue) : "—"}
+                        <td className="px-5 py-3 text-right tabular-nums">
+                          {d.dealValue > 0 ? (
+                            <div>
+                              <span className="font-medium text-gray-800">{fmt(d.dealValue)}</span>
+                              {d.currency && d.currency !== "GBP" && d.currency !== "Pick Currency" && (
+                                <span className="block text-[9px] text-gray-400">{d.currency} {d.dealValueRaw.toLocaleString()}</span>
+                              )}
+                            </div>
+                          ) : "—"}
                         </td>
                       </tr>
                     ))}
