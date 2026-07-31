@@ -75,10 +75,12 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
       ... on BoardRelationValue { linked_items { id name } }
     }
   `;
+  // Fetch Won, Campaign Complete, and Active Leads groups only
+  // "topics" = Active Leads, group_mkthf2s3 = Won, group_mkvk4h72 = Campaign Complete
   const query = `
     query {
       boards(ids: [${BOARD_ID}]) {
-        groups {
+        groups(ids: ["group_mkthf2s3","group_mkvk4h72","topics"]) {
           id title
           items_page(limit: 500) {
             items { ${ITEM_FRAGMENT} }
@@ -148,7 +150,7 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
 }
 
 // Cache Monday data for 5 minutes
-export const fetchAllDeals = unstable_cache(_fetchAllDeals, ["monday-deals-v5"], { revalidate: 300 });
+export const fetchAllDeals = unstable_cache(_fetchAllDeals, ["monday-deals-v6"], { revalidate: 300 });
 
 const TALENT_BOARD_ID = 2110287888;
 
