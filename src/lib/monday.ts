@@ -206,8 +206,8 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
   });
 }
 
-// Cache Monday data for 5 minutes
-export const fetchAllDeals = unstable_cache(_fetchAllDeals, ["monday-deals-v11"], { revalidate: 300 });
+// Cache Monday data for 1 hour
+export const fetchAllDeals = unstable_cache(_fetchAllDeals, ["monday-deals-v11"], { revalidate: 3600 });
 
 const TALENT_BOARD_ID = 2110287888;
 
@@ -302,7 +302,7 @@ async function _fetchTalentProfiles(): Promise<TalentProfile[]> {
   return profiles;
 }
 
-export const fetchTalentProfiles = unstable_cache(_fetchTalentProfiles, ["monday-talent-profiles-v6"], { revalidate: 300 });
+export const fetchTalentProfiles = unstable_cache(_fetchTalentProfiles, ["monday-talent-profiles-v6"], { revalidate: 3600 });
 
 const DONE_GROUPS = new Set(["group_mkthf2s3", "group_mkvk4h72"]);
 

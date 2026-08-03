@@ -1,4 +1,4 @@
-export const revalidate = 300; // cache for 5 minutes at the edge
+export const revalidate = 3600; // cache for 5 minutes at the edge
 
 import { notFound } from "next/navigation";
 import { getCreatorById } from "@/lib/creators-store";

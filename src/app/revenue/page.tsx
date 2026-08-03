@@ -1,4 +1,4 @@
-export const revalidate = 300; // ISR: cache full page at edge for 5 minutes
+export const revalidate = 3600; // ISR: cache full page at edge for 5 minutes
 
 import { fetchAllDeals, fetchTalentProfiles, isWon, isOngoing, isActive, MondayDeal, ALLOWED_TALENT_GROUPS } from "@/lib/monday";
 import { getAllCreators } from "@/lib/creators-store";
