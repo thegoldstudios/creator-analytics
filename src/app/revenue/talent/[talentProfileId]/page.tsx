@@ -1,4 +1,5 @@
 export const revalidate = 300;
+export const dynamicParams = false; // 404 any ID not in generateStaticParams
 
 import { notFound } from "next/navigation";
 import { fetchTalentProfiles } from "@/lib/monday";
@@ -9,6 +10,12 @@ import { Creator } from "@/lib/types";
 
 function norm(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+// Pre-render every creator page at build time so no user ever hits a cold fetch
+export async function generateStaticParams() {
+  const profiles = await fetchTalentProfiles();
+  return profiles.map((p) => ({ talentProfileId: p.id }));
 }
 
 export default async function TalentRevenuePage({ params }: { params: Promise<{ talentProfileId: string }> }) {
