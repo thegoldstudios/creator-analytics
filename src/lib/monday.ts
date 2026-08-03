@@ -240,14 +240,13 @@ async function _fetchDealsByTalentProfile(talentProfileId: string): Promise<Mond
   return items.map((item) => parseItemToDeal(item, rates));
 }
 
-// Per-creator cache — each creator's deals cached individually for 1 hour
-export function fetchDealsByTalentProfile(talentProfileId: string) {
-  return unstable_cache(
-    () => _fetchDealsByTalentProfile(talentProfileId),
-    [`monday-deals-profile-v1-${talentProfileId}`],
-    { revalidate: 3600 }
-  )();
-}
+// Per-creator cache — arguments are automatically included in the cache key by unstable_cache
+// This must be a module-level cached function (not created per-call) for caching to work
+export const fetchDealsByTalentProfile = unstable_cache(
+  _fetchDealsByTalentProfile,
+  ["monday-deals-profile-v1"],
+  { revalidate: 3600 }
+);
 
 // Cache Monday data for 1 hour
 export const fetchAllDeals = unstable_cache(_fetchAllDeals, ["monday-deals-v11"], { revalidate: 3600 });
@@ -346,6 +345,62 @@ async function _fetchTalentProfiles(): Promise<TalentProfile[]> {
 }
 
 export const fetchTalentProfiles = unstable_cache(_fetchTalentProfiles, ["monday-talent-profiles-v6"], { revalidate: 3600 });
+
+async function _fetchOneTalentProfile(id: string): Promise<TalentProfile | null> {
+  const token = process.env.MONDAY_API_TOKEN;
+  if (!token) throw new Error("MONDAY_API_TOKEN not set");
+
+  const query = `
+    query {
+      items(ids: [${id}]) {
+        id name
+        group { title }
+        column_values(ids: ["multiple_person_mkv1k4m1", "color_mm4f23s4"]) {
+          id text
+        }
+      }
+    }
+  `;
+
+  const res = await fetch(MONDAY_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: token },
+    body: JSON.stringify({ query }),
+    cache: "no-store",
+  });
+
+  if (!res.ok) throw new Error(`Monday API ${res.status}`);
+  const json = await res.json();
+  if (json.errors) throw new Error(json.errors[0]?.message ?? "Monday GraphQL error");
+
+  const item = json?.data?.items?.[0];
+  if (!item) return null;
+
+  const cols: Record<string, string | null> = {};
+  for (const cv of item.column_values as { id: string; text: string | null }[]) {
+    cols[cv.id] = cv.text ?? null;
+  }
+
+  const groupTitle: string = item.group?.title ?? "";
+  const groupLower = groupTitle.toLowerCase();
+  let agent = parseAgent(cols["multiple_person_mkv1k4m1"]);
+  if (!agent && groupLower.includes("gold arena uk")) agent = "Kelvin";
+  if (!agent && groupLower.includes("gold arena us")) agent = "Emerson";
+
+  return {
+    id: item.id as string,
+    name: item.name as string,
+    group: groupTitle,
+    agent,
+    status: cols["color_mm4f23s4"] ?? null,
+  };
+}
+
+export const fetchOneTalentProfile = unstable_cache(
+  _fetchOneTalentProfile,
+  ["monday-talent-profile-single-v1"],
+  { revalidate: 3600 }
+);
 
 const DONE_GROUPS = new Set(["group_mkthf2s3", "group_mkvk4h72"]);
 

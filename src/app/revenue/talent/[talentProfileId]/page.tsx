@@ -1,53 +1,40 @@
 export const revalidate = 3600;
 
 import { notFound } from "next/navigation";
-import { fetchTalentProfiles } from "@/lib/monday";
+import { fetchOneTalentProfile } from "@/lib/monday";
 import { getCreatorDealsByProfileId } from "@/lib/creator-deals";
-import { getAllCreators } from "@/lib/creators-store";
 import CreatorRevenueBoard from "@/components/CreatorRevenueBoard";
 import { Creator } from "@/lib/types";
-
-function norm(s: string) {
-  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
 
 export default async function TalentRevenuePage({ params }: { params: Promise<{ talentProfileId: string }> }) {
   const { talentProfileId } = await params;
 
-  const [profiles, creators] = await Promise.all([
-    fetchTalentProfiles(),
-    getAllCreators(),
+  const [profile, deals] = await Promise.allSettled([
+    fetchOneTalentProfile(talentProfileId),
+    getCreatorDealsByProfileId(talentProfileId),
   ]);
 
-  const profile = profiles.find((p) => p.id === talentProfileId);
-  if (!profile) notFound();
+  if (profile.status === "rejected" || !profile.value) notFound();
 
-  // Try to find matching creator in KV store for photo/avatar
-  const n = norm(profile.name);
-  const match = creators.find((c) => {
-    const cn = norm(c.name);
-    return cn.includes(n) || n.includes(cn);
-  });
+  const p = profile.value;
 
-  // Build a minimal Creator-like object — only name, photo, and id are used by CreatorRevenueBoard
-  const creator: Creator = match ?? {
+  const creator: Creator = {
     id: "",
-    name: profile.name,
+    name: p.name,
     handle: "",
-    avatar: profile.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(),
+    avatar: p.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(),
     category: "",
-    agent: (profile.agent as Creator["agent"]) ?? "Maddie",
+    agent: (p.agent as Creator["agent"]) ?? "Maddie",
     platforms: [],
     analytics: {},
     shareToken: "",
   };
 
-  let deals = null;
-  try {
-    deals = await getCreatorDealsByProfileId(talentProfileId);
-  } catch {
-    // renders with null; board shows error state
-  }
-
-  return <CreatorRevenueBoard creator={creator} initialDeals={deals} backUrl="/revenue" />;
+  return (
+    <CreatorRevenueBoard
+      creator={creator}
+      initialDeals={deals.status === "fulfilled" ? deals.value : null}
+      backUrl="/revenue"
+    />
+  );
 }
