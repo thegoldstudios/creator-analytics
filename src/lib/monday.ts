@@ -69,24 +69,67 @@ function toGBP(amount: number, currency: string, rates: Record<string, number>):
   return Math.round((amount / rate) * 100) / 100;
 }
 
+const DEAL_COL_IDS = `["board_relation_mm0zyhyb","deal_stage","numeric_mkxn9km7","color_mm2f2s8s","formula_mm3j815q","formula_mm3jf9q2","dropdown_mky8d1kf","date_mky8cdtj","color_mkth7qj"]`;
+
+const DEAL_ITEM_FRAGMENT = `
+  id name
+  group { id title }
+  column_values(ids: ${DEAL_COL_IDS}) {
+    id text value
+    ... on BoardRelationValue { linked_items { id name } }
+  }
+`;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseItemToDeal(item: any, rates: Record<string, number>): MondayDeal {
+  const cols: Record<string, { text: string | null; value: string | null; linked_items?: { id: string; name: string }[] }> = {};
+  for (const cv of item.column_values as { id: string; text: string | null; value: string | null; linked_items?: { id: string; name: string }[] }[]) {
+    cols[cv.id] = cv;
+  }
+
+  const linkedItems = cols["board_relation_mm0zyhyb"]?.linked_items ?? [];
+  const talentLinked = linkedItems[0] ?? null;
+  const talentName = talentLinked?.name ?? null;
+  const talentProfileId = talentLinked?.id ?? null;
+  const allTalentProfileIds = linkedItems.map((li) => li.id);
+
+  const platforms = cols["dropdown_mky8d1kf"]?.text
+    ? cols["dropdown_mky8d1kf"]!.text!.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
+
+  const currency = cols["color_mm2f2s8s"]?.text ?? "GBP";
+  const dealValueRaw = parseNum(cols["numeric_mkxn9km7"]?.text);
+  const dealValue = toGBP(dealValueRaw, currency, rates);
+
+  const tgsCut = parseNum(cols["formula_mm3j815q"]?.text) || Math.round(dealValue * 0.2);
+  const talentCut = parseNum(cols["formula_mm3jf9q2"]?.text) || Math.round(dealValue * 0.8);
+
+  return {
+    id: item.id as string,
+    name: item.name as string,
+    url: `https://thegoldstudios-company.monday.com/boards/${BOARD_ID}/pulses/${item.id}`,
+    group: item.group as { id: string; title: string },
+    talentName,
+    talentProfileId,
+    allTalentProfileIds,
+    stage: cols["deal_stage"]?.text ?? "Unknown",
+    dealValue,
+    currency,
+    dealValueRaw,
+    platforms,
+    wonDate: cols["date_mky8cdtj"]?.text ?? null,
+    dealType: cols["color_mkth7qj"]?.text ?? "",
+    talentCut,
+    tgsCut,
+  };
+}
+
 async function _fetchAllDeals(): Promise<MondayDeal[]> {
   const token = process.env.MONDAY_API_TOKEN;
   if (!token) throw new Error("MONDAY_API_TOKEN not set");
 
-  // Fetch exchange rates in parallel with Monday data
   const ratesPromise = fetchExchangeRates();
 
-  const COLS = `["board_relation_mm0zyhyb","deal_stage","numeric_mkxn9km7","color_mm2f2s8s","formula_mm3j815q","formula_mm3jf9q2","dropdown_mky8d1kf","date_mky8cdtj","color_mkth7qj"]`;
-  const ITEM_FRAGMENT = `
-    id name
-    group { id title }
-    column_values(ids: ${COLS}) {
-      id text value
-      ... on BoardRelationValue { linked_items { id name } }
-    }
-  `;
-
-  // Initial fetch: Won, Campaign Complete, and Active Leads groups
   const initialQuery = `
     query {
       boards(ids: [${BOARD_ID}]) {
@@ -94,7 +137,7 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
           id title
           items_page(limit: 500) {
             cursor
-            items { ${ITEM_FRAGMENT} }
+            items { ${DEAL_ITEM_FRAGMENT} }
           }
         }
       }
@@ -117,24 +160,21 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const initialGroups: any[] = initialJson?.data?.boards?.[0]?.groups ?? [];
-  console.log("[monday] groups fetched:", initialGroups.map((g: any) => `${g.title}(${g.id}): ${g.items_page.items.length} items, cursor=${!!g.items_page.cursor}`));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const allItems: any[] = initialGroups.flatMap((g: any) => g.items_page.items);
 
-  // Follow pagination cursors for groups with >500 items
   const cursorFollows = initialGroups
     .filter((g: any) => g.items_page.cursor)
     .map((g: any) =>
       (async () => {
         let cursor: string | null = g.items_page.cursor;
-        let count = g.items_page.items.length;
         while (cursor) {
           const nextQuery = `
             query {
               next_items_page(limit: 500, cursor: "${cursor}") {
                 cursor
-                items { ${ITEM_FRAGMENT} }
+                items { ${DEAL_ITEM_FRAGMENT} }
               }
             }
           `;
@@ -150,60 +190,63 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
           const page = nextJson?.data?.next_items_page;
           const pageItems = page?.items ?? [];
           allItems.push(...pageItems);
-          count += pageItems.length;
           cursor = page?.cursor ?? null;
         }
-        console.log(`[monday] pagination done for ${g.title}: ${count} total items`);
       })()
     );
 
   await Promise.all(cursorFollows);
-  console.log("[monday] total items after pagination:", allItems.length);
 
-  const items = allItems;
+  return allItems.map((item) => parseItemToDeal(item, rates));
+}
 
-  return items.map((item): MondayDeal => {
-    const cols: Record<string, { text: string | null; value: string | null; linked_items?: { id: string; name: string }[] }> = {};
-    for (const cv of item.column_values as { id: string; text: string | null; value: string | null; linked_items?: { id: string; name: string }[] }[]) {
-      cols[cv.id] = cv;
+// Fetch only deals linked to a specific talent profile — much faster for individual creator pages
+async function _fetchDealsByTalentProfile(talentProfileId: string): Promise<MondayDeal[]> {
+  const token = process.env.MONDAY_API_TOKEN;
+  if (!token) throw new Error("MONDAY_API_TOKEN not set");
+
+  const query = `
+    query {
+      boards(ids: [${BOARD_ID}]) {
+        items_page(limit: 500, query_params: {
+          rules: [{
+            column_id: "board_relation_mm0zyhyb"
+            compare_value: ["${talentProfileId}"]
+            operator: any_of
+          }]
+        }) {
+          items { ${DEAL_ITEM_FRAGMENT} }
+        }
+      }
     }
+  `;
 
-    const linkedItems = cols["board_relation_mm0zyhyb"]?.linked_items ?? [];
-    const talentLinked = linkedItems[0] ?? null;
-    const talentName = talentLinked?.name ?? null;
-    const talentProfileId = talentLinked?.id ?? null;
-    const allTalentProfileIds = linkedItems.map((li) => li.id);
+  const [res, rates] = await Promise.all([
+    fetch(MONDAY_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: token },
+      body: JSON.stringify({ query }),
+      cache: "no-store",
+    }),
+    fetchExchangeRates(),
+  ]);
 
-    const platforms = cols["dropdown_mky8d1kf"]?.text
-      ? cols["dropdown_mky8d1kf"]!.text!.split(",").map((s) => s.trim()).filter(Boolean)
-      : [];
+  if (!res.ok) throw new Error(`Monday API ${res.status}`);
+  const json = await res.json();
+  if (json.errors) throw new Error(json.errors[0]?.message ?? "Monday GraphQL error");
 
-    const currency = cols["color_mm2f2s8s"]?.text ?? "GBP";
-    const dealValueRaw = parseNum(cols["numeric_mkxn9km7"]?.text);
-    const dealValue = toGBP(dealValueRaw, currency, rates);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const items: any[] = json?.data?.boards?.[0]?.items_page?.items ?? [];
+  return items.map((item) => parseItemToDeal(item, rates));
+}
 
-    const tgsCut = parseNum(cols["formula_mm3j815q"]?.text) || Math.round(dealValue * 0.2);
-    const talentCut = parseNum(cols["formula_mm3jf9q2"]?.text) || Math.round(dealValue * 0.8);
-
-    return {
-      id: item.id as string,
-      name: item.name as string,
-      url: `https://thegoldstudios-company.monday.com/boards/${BOARD_ID}/pulses/${item.id}`,
-      group: item.group as { id: string; title: string },
-      talentName,
-      talentProfileId,
-      allTalentProfileIds,
-      stage: cols["deal_stage"]?.text ?? "Unknown",
-      dealValue,
-      currency,
-      dealValueRaw,
-      platforms,
-      wonDate: cols["date_mky8cdtj"]?.text ?? null,
-      dealType: cols["color_mkth7qj"]?.text ?? "",
-      talentCut,
-      tgsCut,
-    };
-  });
+// Per-creator cache — each creator's deals cached individually for 1 hour
+export function fetchDealsByTalentProfile(talentProfileId: string) {
+  return unstable_cache(
+    () => _fetchDealsByTalentProfile(talentProfileId),
+    [`monday-deals-profile-v1-${talentProfileId}`],
+    { revalidate: 3600 }
+  )();
 }
 
 // Cache Monday data for 1 hour

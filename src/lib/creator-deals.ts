@@ -1,4 +1,4 @@
-import { fetchAllDeals, isWon, isActive, MondayDeal } from "@/lib/monday";
+import { fetchAllDeals, fetchDealsByTalentProfile, isWon, isActive, MondayDeal } from "@/lib/monday";
 
 function norm(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -109,8 +109,8 @@ function _aggregate(deals: MondayDeal[]): CreatorDeals {
 }
 
 export async function getCreatorDealsByProfileId(talentProfileId: string): Promise<CreatorDeals> {
-  const all = await fetchAllDeals();
-  return _aggregate(all.filter((d) => d.allTalentProfileIds.includes(talentProfileId)));
+  const deals = await fetchDealsByTalentProfile(talentProfileId);
+  return _aggregate(deals);
 }
 
 export async function getCreatorDeals(talentName: string): Promise<CreatorDeals> {
