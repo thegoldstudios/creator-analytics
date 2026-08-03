@@ -249,7 +249,7 @@ export const fetchDealsByTalentProfile = unstable_cache(
 );
 
 // Cache Monday data for 1 hour
-export const fetchAllDeals = unstable_cache(_fetchAllDeals, ["monday-deals-v11"], { revalidate: 3600 });
+export const fetchAllDeals = unstable_cache(_fetchAllDeals, ["monday-deals-v12"], { revalidate: 3600 });
 
 const TALENT_BOARD_ID = 2110287888;
 
