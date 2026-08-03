@@ -180,9 +180,23 @@ function SortBtn({ active, dir, onClick }: { active: boolean; dir: SortDir; onCl
   );
 }
 
-export default function CreatorRevenueBoard({ creator, initialDeals, backUrl }: { creator: Creator; initialDeals: CreatorDeals | null; backUrl?: string }) {
-  const [deals] = useState<CreatorDeals | null>(initialDeals);
-  const error = initialDeals === null ? "No deal data found" : null;
+export default function CreatorRevenueBoard({ creator, initialDeals, talentProfileId, backUrl }: { creator: Creator; initialDeals: CreatorDeals | null; talentProfileId?: string; backUrl?: string }) {
+  const [deals, setDeals] = useState<CreatorDeals | null>(initialDeals);
+  const [loading, setLoading] = useState(initialDeals === null && !!talentProfileId);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialDeals !== null || !talentProfileId) return;
+    setLoading(true);
+    fetch(`/api/creator-deals/${talentProfileId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) setError(data.error);
+        else setDeals(data);
+      })
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
+  }, [talentProfileId, initialDeals]);
   const [period, setPeriod] = useState<Period>("month");
   const [dealsPeriod, setDealsPeriod] = useState<Period>("lifetime");
   const [sortField, setSortField] = useState<SortField>("date");
@@ -311,7 +325,30 @@ export default function CreatorRevenueBoard({ creator, initialDeals, backUrl }: 
           </div>
         </div>
 
-        {error && (
+        {loading && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="bg-white rounded-xl border border-gray-100 p-5">
+                  <div className="h-3 w-16 bg-gray-100 rounded mb-2 animate-pulse" />
+                  <div className="h-7 w-20 bg-gray-200 rounded animate-pulse" />
+                </div>
+              ))}
+            </div>
+            <div className="bg-white rounded-xl border border-gray-100 p-5">
+              <div className="h-3 w-32 bg-gray-100 rounded mb-4 animate-pulse" />
+              <div className="h-40 bg-gray-50 rounded animate-pulse" />
+            </div>
+            <div className="bg-white rounded-xl border border-gray-100 p-5 space-y-3">
+              <div className="h-3 w-20 bg-gray-100 rounded animate-pulse" />
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="h-4 bg-gray-100 rounded animate-pulse" />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!loading && error && (
           <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-xs text-red-500 mb-6">
             {`Error loading deal data: ${error}`}
           </div>
