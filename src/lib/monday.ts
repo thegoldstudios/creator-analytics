@@ -1,4 +1,8 @@
-import { unstable_cache } from "next/cache";
+import { kv } from "@vercel/kv";
+
+const KV_DEALS_KEY = "monday:deals:v1";
+const KV_PROFILES_KEY = "monday:profiles:v1";
+const KV_TTL = 3900; // 65 minutes — outlasts the cron interval
 
 const MONDAY_API = "https://api.monday.com/v2";
 const BOARD_ID = 2084113525;
@@ -53,12 +57,15 @@ async function _fetchExchangeRates(): Promise<Record<string, number>> {
   }
 }
 
-// Cache exchange rates for 1 hour
-export const fetchExchangeRates = unstable_cache(
-  _fetchExchangeRates,
-  ["exchange-rates-gbp"],
-  { revalidate: 3600 }
-);
+let _ratesCache: Record<string, number> | null = null;
+let _ratesCacheAt = 0;
+
+export async function fetchExchangeRates(): Promise<Record<string, number>> {
+  if (_ratesCache && Date.now() - _ratesCacheAt < 3600_000) return _ratesCache;
+  _ratesCache = await _fetchExchangeRates();
+  _ratesCacheAt = Date.now();
+  return _ratesCache;
+}
 
 function toGBP(amount: number, currency: string, rates: Record<string, number>): number {
   if (!amount) return 0;
@@ -200,56 +207,22 @@ async function _fetchAllDeals(): Promise<MondayDeal[]> {
   return allItems.map((item) => parseItemToDeal(item, rates));
 }
 
-// Fetch only deals linked to a specific talent profile — much faster for individual creator pages
-async function _fetchDealsByTalentProfile(talentProfileId: string): Promise<MondayDeal[]> {
-  const token = process.env.MONDAY_API_TOKEN;
-  if (!token) throw new Error("MONDAY_API_TOKEN not set");
 
-  const query = `
-    query {
-      boards(ids: [${BOARD_ID}]) {
-        items_page(limit: 500, query_params: {
-          rules: [{
-            column_id: "board_relation_mm0zyhyb"
-            compare_value: ["${talentProfileId}"]
-            operator: any_of
-          }]
-        }) {
-          items { ${DEAL_ITEM_FRAGMENT} }
-        }
-      }
-    }
-  `;
-
-  const [res, rates] = await Promise.all([
-    fetch(MONDAY_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: token },
-      body: JSON.stringify({ query }),
-      cache: "no-store",
-    }),
-    fetchExchangeRates(),
-  ]);
-
-  if (!res.ok) throw new Error(`Monday API ${res.status}`);
-  const json = await res.json();
-  if (json.errors) throw new Error(json.errors[0]?.message ?? "Monday GraphQL error");
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const items: any[] = json?.data?.boards?.[0]?.items_page?.items ?? [];
-  return items.map((item) => parseItemToDeal(item, rates));
+export async function fetchAllDeals(): Promise<MondayDeal[]> {
+  try {
+    const cached = await kv.get<MondayDeal[]>(KV_DEALS_KEY);
+    if (cached && cached.length > 0) return cached;
+  } catch { /* KV unavailable */ }
+  const deals = await _fetchAllDeals();
+  try { await kv.set(KV_DEALS_KEY, deals, { ex: KV_TTL }); } catch { /* ignore */ }
+  return deals;
 }
 
-// Per-creator cache — arguments are automatically included in the cache key by unstable_cache
-// This must be a module-level cached function (not created per-call) for caching to work
-export const fetchDealsByTalentProfile = unstable_cache(
-  _fetchDealsByTalentProfile,
-  ["monday-deals-profile-v1"],
-  { revalidate: 3600 }
-);
-
-// Cache Monday data for 1 hour
-export const fetchAllDeals = unstable_cache(_fetchAllDeals, ["monday-deals-v12"], { revalidate: 3600 });
+export async function syncDealsToKV(): Promise<MondayDeal[]> {
+  const deals = await _fetchAllDeals();
+  await kv.set(KV_DEALS_KEY, deals, { ex: KV_TTL });
+  return deals;
+}
 
 const TALENT_BOARD_ID = 2110287888;
 
@@ -344,7 +317,21 @@ async function _fetchTalentProfiles(): Promise<TalentProfile[]> {
   return profiles;
 }
 
-export const fetchTalentProfiles = unstable_cache(_fetchTalentProfiles, ["monday-talent-profiles-v6"], { revalidate: 3600 });
+export async function fetchTalentProfiles(): Promise<TalentProfile[]> {
+  try {
+    const cached = await kv.get<TalentProfile[]>(KV_PROFILES_KEY);
+    if (cached && cached.length > 0) return cached;
+  } catch { /* KV unavailable */ }
+  const profiles = await _fetchTalentProfiles();
+  try { await kv.set(KV_PROFILES_KEY, profiles, { ex: KV_TTL }); } catch { /* ignore */ }
+  return profiles;
+}
+
+export async function syncProfilesToKV(): Promise<TalentProfile[]> {
+  const profiles = await _fetchTalentProfiles();
+  await kv.set(KV_PROFILES_KEY, profiles, { ex: KV_TTL });
+  return profiles;
+}
 
 async function _fetchOneTalentProfile(id: string): Promise<TalentProfile | null> {
   const token = process.env.MONDAY_API_TOKEN;
@@ -396,11 +383,17 @@ async function _fetchOneTalentProfile(id: string): Promise<TalentProfile | null>
   };
 }
 
-export const fetchOneTalentProfile = unstable_cache(
-  _fetchOneTalentProfile,
-  ["monday-talent-profile-single-v1"],
-  { revalidate: 3600 }
-);
+export async function fetchOneTalentProfile(id: string): Promise<TalentProfile | null> {
+  // Check the profiles KV cache first to avoid an extra Monday API call
+  try {
+    const cached = await kv.get<TalentProfile[]>(KV_PROFILES_KEY);
+    if (cached && cached.length > 0) {
+      const match = cached.find((p) => p.id === id);
+      if (match) return match;
+    }
+  } catch { /* fall through */ }
+  return _fetchOneTalentProfile(id);
+}
 
 const DONE_GROUPS = new Set(["group_mkthf2s3", "group_mkvk4h72"]);
 
