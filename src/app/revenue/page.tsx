@@ -1,4 +1,5 @@
-export const revalidate = 3600; // ISR: cache full page at edge for 5 minutes
+export const revalidate = 3600;
+export const maxDuration = 60; // allow up to 60s for Monday pagination
 
 import { fetchAllDeals, fetchTalentProfiles, isWon, isOngoing, isActive, MondayDeal, ALLOWED_TALENT_GROUPS } from "@/lib/monday";
 import { getAllCreators } from "@/lib/creators-store";

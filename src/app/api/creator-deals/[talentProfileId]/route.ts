@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCreatorDealsByProfileId } from "@/lib/creator-deals";
 
 export const revalidate = 3600;
+export const maxDuration = 60;
 
 export async function GET(
   _req: NextRequest,
