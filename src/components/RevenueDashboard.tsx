@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Footer from "@/components/Footer";
@@ -23,11 +23,6 @@ export interface CreatorRevSummary {
   talentStatus: string | null;
 }
 
-interface Props {
-  summaries: CreatorRevSummary[];
-  error: string | null;
-}
-
 const AGENTS: (Agent | "All")[] = ["All", "Maddie", "Elicia", "Olivia", "Seth", "Kelvin", "Emerson"];
 
 function fmtNum(n: number) {
@@ -36,9 +31,23 @@ function fmtNum(n: number) {
   return `£${Math.round(n).toLocaleString()}`;
 }
 
-export default function RevenueDashboard({ summaries, error }: Props) {
+export default function RevenueDashboard() {
+  const [summaries, setSummaries] = useState<CreatorRevSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeAgent, setActiveAgent] = useState<Agent | "All">("All");
+
+  useEffect(() => {
+    fetch("/api/revenue-summary")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) setError(data.error);
+        else setSummaries(data);
+      })
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
+  }, []);
 
   const filtered = useMemo(() => summaries.filter((s) => {
     const matchSearch = s.talentName.toLowerCase().includes(search.toLowerCase());
@@ -121,7 +130,16 @@ export default function RevenueDashboard({ summaries, error }: Props) {
           </span>
         </div>
 
-        {error ? (
+        {loading ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              {[0,1].map((i) => <div key={i} className="bg-white rounded-xl border border-gray-100 p-4 h-16 animate-pulse" />)}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {[...Array(9)].map((_, i) => <div key={i} className="bg-white rounded-2xl border border-gray-100 h-40 animate-pulse" />)}
+            </div>
+          </div>
+        ) : error ? (
           <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-xs text-red-500 mb-6">
             {error.includes("MONDAY_API_TOKEN")
               ? "Add MONDAY_API_TOKEN to Vercel environment variables."
