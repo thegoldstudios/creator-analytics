@@ -25,6 +25,11 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // Cron routes are called by Vercel's scheduler, not browsers
+  if (pathname.startsWith("/api/cron/")) {
+    return NextResponse.next();
+  }
+
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   const expected = Buffer.from(SECRET).toString("base64");
 
