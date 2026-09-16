@@ -4,7 +4,7 @@ export default function TermsOfService() {
       {/* App icon + name */}
       <div className="flex items-center gap-3 mb-10">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/tgs-logo.png" alt="Gold Studios Talent Analytics" width={40} height={40} className="object-contain" />
+        <img src="/app-icon.png" alt="Gold Studios Talent Analytics" width={40} height={40} className="object-contain" />
         <span className="text-[15px] font-semibold text-gray-900">Gold Studios Talent Analytics</span>
       </div>
 
