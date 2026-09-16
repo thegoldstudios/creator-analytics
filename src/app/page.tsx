@@ -50,6 +50,8 @@ export default function RosterPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [fetchingPhoto, setFetchingPhoto] = useState(false);
   const [photoFetchError, setPhotoFetchError] = useState("");
+  const [shareLink, setShareLink] = useState<{ name: string; url: string } | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const fetchCreators = useCallback(async () => {
     const res = await fetch("/api/creators");
@@ -132,6 +134,10 @@ export default function RosterPage() {
         });
         const created = await res.json();
         setCreators((prev) => [...prev, created]);
+        setShareLink({
+          name: created.name,
+          url: `${window.location.origin}/connect/${created.shareToken}`,
+        });
       } else if (modal === "edit" && editing) {
         const res = await fetch(`/api/creators/${editing.id}`, {
           method: "PATCH",
@@ -144,6 +150,17 @@ export default function RosterPage() {
       setModal(null);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function copyShareLink() {
+    if (!shareLink) return;
+    try {
+      await navigator.clipboard.writeText(shareLink.url);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      // Clipboard API unavailable — the link is still visible to copy manually
     }
   }
 
@@ -526,6 +543,45 @@ export default function RosterPage() {
                 Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share link prompt — shown right after a creator is added */}
+      {shareLink && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 className="text-[15px] font-semibold text-gray-900 mb-2 text-center">
+              {shareLink.name} added
+            </h3>
+            <p className="text-[13px] text-gray-500 mb-4 text-center">
+              Send them this link so they can connect their accounts.
+            </p>
+            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-4">
+              <input
+                readOnly
+                value={shareLink.url}
+                onFocus={(e) => e.target.select()}
+                className="flex-1 bg-transparent text-[12px] text-gray-700 focus:outline-none truncate"
+              />
+              <button
+                onClick={copyShareLink}
+                className="text-[12px] font-medium text-gray-900 whitespace-nowrap hover:text-gray-600 transition-colors"
+              >
+                {linkCopied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+            <button
+              onClick={() => setShareLink(null)}
+              className="w-full px-4 py-2 text-[13px] font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Done
+            </button>
           </div>
         </div>
       )}
