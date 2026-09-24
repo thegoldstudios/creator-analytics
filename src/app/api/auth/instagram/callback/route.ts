@@ -22,38 +22,56 @@ export async function GET(req: NextRequest) {
 
   const all = await getAllCreators();
   const creator = all.find((c) => c.shareToken === shareToken);
-  if (!creator) return NextResponse.redirect(new URL("/", req.url));
-
-  // Exchange code for short-lived token
-  const tokenRes = await fetch("https://api.instagram.com/oauth/access_token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      grant_type: "authorization_code",
-      redirect_uri: REDIRECT_URI,
-      code,
-    }),
-  });
-
-  if (!tokenRes.ok) {
-    return NextResponse.redirect(new URL(`/connect/${shareToken}?error=token`, req.url));
+  if (!creator) {
+    console.error(`[instagram callback] no creator found for shareToken=${shareToken}`);
+    return NextResponse.redirect(new URL(`/connect/${shareToken}?error=creator`, req.url));
   }
 
-  const { access_token, user_id } = await tokenRes.json();
+  try {
+    // Exchange code for short-lived token
+    const tokenRes = await fetch("https://api.instagram.com/oauth/access_token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+        grant_type: "authorization_code",
+        redirect_uri: REDIRECT_URI,
+        code,
+      }),
+    });
 
-  // Exchange for long-lived token (60 days)
-  const longRes = await fetch(
-    `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${CLIENT_SECRET}&access_token=${access_token}`
-  );
-  const longData = longRes.ok ? await longRes.json() : {};
+    if (!tokenRes.ok) {
+      const detail = await tokenRes.text().catch(() => "");
+      console.error(`[instagram callback] short-lived token exchange failed (${tokenRes.status}): ${detail}`);
+      return NextResponse.redirect(new URL(`/connect/${shareToken}?error=token`, req.url));
+    }
 
-  await storeToken(creator.id, "instagram", {
-    access_token: longData.access_token ?? access_token,
-    user_id: String(user_id),
-    expires_at: String(Date.now() + (longData.expires_in ?? 5184000) * 1000),
-  });
+    const { access_token, user_id } = await tokenRes.json();
+    if (!access_token) {
+      console.error(`[instagram callback] no access_token in short-lived response`);
+      return NextResponse.redirect(new URL(`/connect/${shareToken}?error=token`, req.url));
+    }
 
-  return NextResponse.redirect(new URL(`/connect/${shareToken}?success=instagram`, req.url));
+    // Exchange for long-lived token (60 days)
+    const longRes = await fetch(
+      `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${CLIENT_SECRET}&access_token=${access_token}`
+    );
+    if (!longRes.ok) {
+      const detail = await longRes.text().catch(() => "");
+      console.error(`[instagram callback] long-lived token exchange failed (${longRes.status}): ${detail}`);
+    }
+    const longData = longRes.ok ? await longRes.json() : {};
+
+    await storeToken(creator.id, "instagram", {
+      access_token: longData.access_token ?? access_token,
+      user_id: String(user_id),
+      expires_at: String(Date.now() + (longData.expires_in ?? 5184000) * 1000),
+    });
+
+    return NextResponse.redirect(new URL(`/connect/${shareToken}?success=instagram`, req.url));
+  } catch (err) {
+    console.error(`[instagram callback] unexpected error:`, err);
+    return NextResponse.redirect(new URL(`/connect/${shareToken}?error=token`, req.url));
+  }
 }

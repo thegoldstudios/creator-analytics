@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { creators } from "@/lib/mock-data";
+import { getAllCreators } from "@/lib/creators-store";
 import { storeToken } from "@/lib/kv";
 
 const CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY ?? "";
@@ -23,32 +23,48 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const creator = creators.find((c) => c.shareToken === shareToken);
-  if (!creator) return NextResponse.redirect(new URL("/", req.url));
-
-  const tokenRes = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_key: CLIENT_KEY,
-      client_secret: CLIENT_SECRET,
-      code,
-      grant_type: "authorization_code",
-      redirect_uri: REDIRECT_URI,
-    }),
-  });
-
-  if (!tokenRes.ok) {
-    return NextResponse.redirect(new URL(`/connect/${shareToken}?error=token`, req.url));
+  const all = await getAllCreators();
+  const creator = all.find((c) => c.shareToken === shareToken);
+  if (!creator) {
+    console.error(`[tiktok callback] no creator found for shareToken=${shareToken}`);
+    return NextResponse.redirect(new URL(`/connect/${shareToken}?error=creator`, req.url));
   }
 
-  const tokens = await tokenRes.json();
-  await storeToken(creator.id, "tiktok", {
-    access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token ?? "",
-    open_id: tokens.open_id ?? "",
-    expires_at: String(Date.now() + (tokens.expires_in ?? 86400) * 1000),
-  });
+  try {
+    const tokenRes = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_key: CLIENT_KEY,
+        client_secret: CLIENT_SECRET,
+        code,
+        grant_type: "authorization_code",
+        redirect_uri: REDIRECT_URI,
+      }),
+    });
 
-  return NextResponse.redirect(new URL(`/connect/${shareToken}?success=tiktok`, req.url));
+    if (!tokenRes.ok) {
+      const detail = await tokenRes.text().catch(() => "");
+      console.error(`[tiktok callback] token exchange failed (${tokenRes.status}): ${detail}`);
+      return NextResponse.redirect(new URL(`/connect/${shareToken}?error=token`, req.url));
+    }
+
+    const tokens = await tokenRes.json();
+    if (!tokens.access_token) {
+      console.error(`[tiktok callback] token exchange returned no access_token: ${JSON.stringify(tokens)}`);
+      return NextResponse.redirect(new URL(`/connect/${shareToken}?error=token`, req.url));
+    }
+
+    await storeToken(creator.id, "tiktok", {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token ?? "",
+      open_id: tokens.open_id ?? "",
+      expires_at: String(Date.now() + (tokens.expires_in ?? 86400) * 1000),
+    });
+
+    return NextResponse.redirect(new URL(`/connect/${shareToken}?success=tiktok`, req.url));
+  } catch (err) {
+    console.error(`[tiktok callback] unexpected error:`, err);
+    return NextResponse.redirect(new URL(`/connect/${shareToken}?error=token`, req.url));
+  }
 }
