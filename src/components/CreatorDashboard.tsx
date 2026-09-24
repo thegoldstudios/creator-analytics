@@ -25,6 +25,26 @@ const PERIOD_LABELS: Record<Period, string> = {
   yearly: "Yearly",
 };
 
+// Base for a platform with no seeded mock data, so live-only creators can still render
+function emptyPlatformAnalytics(platform: Platform): PlatformAnalytics {
+  return {
+    platform,
+    followers: 0,
+    followersGrowthPct: 0,
+    engagementRate: 0,
+    followerEngagementRate: 0,
+    totalVideos: 0,
+    totalImpressions: 0,
+    totalEngagements: 0,
+    avgViews: 0,
+    avgLikes: 0,
+    avgComments: 0,
+    gender: { male: 0, female: 0 },
+    ageGender: { all: [], male: [], female: [] },
+    topCountries: [],
+  };
+}
+
 // Scale total metrics by time period (averages are per-video so stay constant)
 function applyPeriod(data: PlatformAnalytics, period: Period): PlatformAnalytics {
   const scale = period === "monthly" ? 1 / 12 : period === "quarterly" ? 1 / 4 : 1;
@@ -89,6 +109,8 @@ export default function CreatorDashboard({ creator, isShare = false }: Props) {
   const [ytLive, setYtLive] = useState(false);
   const [igAnalytics, setIgAnalytics] = useState<Record<string, unknown> | null>(null);
   const [igLive, setIgLive] = useState(false);
+  const [tkAnalytics, setTkAnalytics] = useState<Record<string, unknown> | null>(null);
+  const [tkLive, setTkLive] = useState(false);
 
   // Try to fetch OAuth-backed YouTube Analytics first; fall back to public API stats
   useEffect(() => {
@@ -126,9 +148,22 @@ export default function CreatorDashboard({ creator, isShare = false }: Props) {
       .catch(() => {});
   }, [creator.id]);
 
+  // Fetch OAuth-backed TikTok analytics
+  useEffect(() => {
+    fetch(`/api/tiktok/analytics?creatorId=${creator.id}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.live) { setTkAnalytics(d); setTkLive(true); }
+      })
+      .catch(() => {});
+  }, [creator.id]);
+
   const isYouTubePlatform = activePlatform === "youtube_shorts" || activePlatform === "youtube_longform";
   const isInstagramPlatform = activePlatform === "instagram";
-  const rawData = creator.analytics[activePlatform];
+  const isTikTokPlatform = activePlatform === "tiktok";
+  const hasLiveDataForPlatform =
+    (isYouTubePlatform && ytLive) || (isInstagramPlatform && igLive) || (isTikTokPlatform && tkLive);
+  const rawData = creator.analytics[activePlatform] ?? (hasLiveDataForPlatform ? emptyPlatformAnalytics(activePlatform) : undefined);
 
   // Overlay real YouTube analytics when available
   const ytPatched = rawData && ytAnalytics && isYouTubePlatform
@@ -172,7 +207,24 @@ export default function CreatorDashboard({ creator, isShare = false }: Props) {
       }
     : ytPatched;
 
-  const data = patchedRaw ? applyPeriod(patchedRaw, period) : undefined;
+  // Overlay real TikTok analytics when available
+  const tk = tkAnalytics as { followers?: number; totalVideos?: number; totalImpressions?: number; totalLikes?: number; totalComments?: number; avgViews?: number; avgLikes?: number; avgComments?: number; engagementRate?: number; followerEngagementRate?: number } | null;
+  const tkPatched = patchedRaw && tk && isTikTokPlatform && tkLive
+    ? {
+        ...patchedRaw,
+        followers: tk.followers ?? patchedRaw.followers,
+        totalVideos: tk.totalVideos ?? patchedRaw.totalVideos,
+        totalImpressions: tk.totalImpressions ?? patchedRaw.totalImpressions,
+        totalEngagements: ((tk.totalLikes ?? 0) + (tk.totalComments ?? 0)) || patchedRaw.totalEngagements,
+        avgViews: tk.avgViews ?? patchedRaw.avgViews,
+        avgLikes: tk.avgLikes ?? patchedRaw.avgLikes,
+        avgComments: tk.avgComments ?? patchedRaw.avgComments,
+        engagementRate: tk.engagementRate ?? patchedRaw.engagementRate,
+        followerEngagementRate: tk.followerEngagementRate ?? patchedRaw.followerEngagementRate,
+      }
+    : patchedRaw;
+
+  const data = tkPatched ? applyPeriod(tkPatched, period) : undefined;
 
   const growthLabel = period === "monthly" ? "last 30 days" : period === "quarterly" ? "last 90 days" : "last 12 months";
 

@@ -101,6 +101,44 @@ export async function refreshInstagramToken(
   return { accessToken: updated.access_token, userId: token.user_id };
 }
 
+const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY ?? "";
+const TIKTOK_CLIENT_SECRET = process.env.TIKTOK_CLIENT_SECRET ?? "";
+
+export async function refreshTikTokToken(
+  creatorId: string
+): Promise<{ accessToken: string } | null> {
+  const token = await getToken(creatorId, "tiktok");
+  if (!token) return null;
+
+  const expiresAt = parseInt(token.expires_at ?? "0");
+  if (Date.now() < expiresAt - 60_000) return { accessToken: token.access_token };
+
+  if (!token.refresh_token) return { accessToken: token.access_token };
+
+  const res = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_key: TIKTOK_CLIENT_KEY,
+      client_secret: TIKTOK_CLIENT_SECRET,
+      grant_type: "refresh_token",
+      refresh_token: token.refresh_token,
+    }),
+  });
+
+  if (!res.ok) return { accessToken: token.access_token };
+
+  const data = await res.json();
+  const updated = {
+    ...token,
+    access_token: data.access_token ?? token.access_token,
+    refresh_token: data.refresh_token ?? token.refresh_token,
+    expires_at: String(Date.now() + (data.expires_in ?? 86400) * 1000),
+  };
+  await storeToken(creatorId, "tiktok", updated);
+  return { accessToken: updated.access_token };
+}
+
 export async function getConnectedPlatforms(creatorId: string): Promise<string[]> {
   const store = await getKV();
   if (!store) return [];
